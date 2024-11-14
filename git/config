@@ -1,0 +1,82 @@
+[alias]
+	a = "add -p"
+	bD = "branch -D"
+	ba = "branch -a"
+	bd = "branch -d"
+	bdm = "!git branch --merged | grep -v '*' | xargs -n 1 git branch -d"
+	c = "commit"
+	caa = "commit --amend -C HEAD -a"
+	co = "checkout"
+	cob = "checkout -b"
+	d = "diff"
+	dc = "diff --cached"
+	ds = "diff --staged"
+	dump = "cat-file -p"
+	f = "fetch -p"
+	h1rd = "hard HEAD~1"
+	hard = "reset --hard"
+	hist = "log --pretty=format:\"%h %ad | %s%d [%an]\" --graph --date=short"
+	lg = "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
+	lgs = "log --stat"
+	lol = "log --graph --decorate --pretty=oneline --abbrev-commit"
+	lola = "log --graph --decorate --pretty=oneline --abbrev-commit --all"
+	p = "push"
+	plog = "log --graph --pretty='format:%C(red)%d%C(reset) %C(yellow)%h%C(reset) %ar %C(green)%aN%C(reset) %s'"
+	r = "restore"
+	rank = "shortlog -sn --no-merges"
+	rs = "restore --staged"
+	s = "status"
+	s1ft = "soft HEAD~1"
+	soft = "reset --soft"
+	st = "status -sb"
+	tlog = "log --stat --since='1 Day Ago' --graph --pretty=oneline --abbrev-commit --date=relative"
+	type = "cat-file -t"
+    stls = "stash list"
+
+[color]
+	branch = "auto"
+	diff = "auto"
+	interactive = "auto"
+	status = "auto"
+
+[commit]
+	gpgSign = true
+
+[core]
+	excludesfile = "~/.config/git/ignore"
+
+[credential]
+	helper = "cache"
+
+[filter "lfs"]
+	clean = "git-lfs clean -- %f"
+	process = "git-lfs filter-process"
+	required = true
+	smudge = "git-lfs smudge -- %f"
+
+[gitreview]
+	username = "brett"
+
+[gitubuntu]
+	lpuser = "brettmilford"
+
+[gpg]
+	program = "gpg2"
+
+[init]
+	defaultBranch = "devel"
+
+[pull]
+	rebase = false
+
+[tag]
+	gpgSign = true
+
+[url "git+ssh://brettmilford@git.launchpad.net/"]
+	insteadOf = "lp:"
+
+[user]
+	email = "brettmilford@gmail.com"
+	name = "Brett Milford"
+[push]
+	autoSetupRemote = true
