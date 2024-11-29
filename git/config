@@ -75,8 +75,5 @@
 [url "git+ssh://brettmilford@git.launchpad.net/"]
 	insteadOf = "lp:"
 
-[user]
-	email = "brettmilford@gmail.com"
-	name = "Brett Milford"
 [push]
 	autoSetupRemote = true
