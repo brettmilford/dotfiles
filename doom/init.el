@@ -34,8 +34,10 @@
        spell
 
        :tools
+       biblio
        (eval +overlay)
        lookup
+       magit
 
        :os
        (:if (featurep :system 'macos) macos)
@@ -47,7 +49,12 @@
             +noter
             +pandoc
             +present)
+       latex
        sh
+       (rest +jq)
+       yaml
+       json
+       data
 
        :config
        pkm
