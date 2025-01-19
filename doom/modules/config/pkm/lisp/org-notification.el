@@ -9,7 +9,8 @@
 (setq org-directory (expand-file-name "~/org"))
 (setq org-agenda-files (list org-directory))
 ;; NOTE: won't pickup entries w/o a time specificed
-(run-at-time 60 1200 'org-agenda-to-appt)
+(unless +pkm-encrypt-enabled
+  (run-at-time 60 1200 'org-agenda-to-appt))
 ;(org-agenda-to-appt t nil :deadline :deadline* :scheduled :scheduled* :timestamp)
 
 (require 'appt)
