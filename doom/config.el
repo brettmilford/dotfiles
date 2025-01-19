@@ -1,27 +1,35 @@
-;;; .doom.d/config.el -*- lexical-binding: t; -*-
+;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
 
+(setq frame-title-format '("%b – Emacs"))
+(setq +doom-dashboard-name "*Dash*")
 (setq +doom-dashboard-ascii-banner-fn
 (lambda ()
   (let* ((banner '("
-                       :::                                     :
-                     :=+*+=- :-=++=-:                       -=+++-:
-            ::     :=**+****+*******+-:                   :+******=
-           :=*-::-+*+-:::=***=---=+***+-:      ::       ::+*=::-**+
-           -******+-:    :-=:      :=****=-:::=+::    :=---:   :+*-
-           :-=++=:     :==:          :=*******+::+=--=+-       -*+:
-                      -+=        -=:   :-====-::+****+:        +*:
-                    :=*-    :--:=***-          :-==-:         :*-
-                   :+*-  :-=+=::=+***:                        ++:
-                  :+*+:-=++-:    :=**-                       :*:
-                 :=****+=:        :**:                       +=
-                 :=++=:    ::::   :*=              ::       :*:
-                     :-==+++**+:  :=:::           :=-       +=
-                 :-=+**++=-=*+-:    :=:          :+-       :*:
-              :-+**+=-:  :--:      -+-          -+-        =+
-             -+**+-:     ::      :++:      :: :=+:        :*-
-           :=***+   ::--:       -*=:      -++=++:         =+:
-           :*****+==+=-:      :+*-      :=****=:         :*-
-            :=****+-:    :: :-*+:      :++--=:  :::      :-"))
+                    ##@@@##  ##@@##                        ##@@@#
+            #     ##@@@@@@@@@@@@@@@@#                    #@@@@@@@#
+           #@####@@@#  ##@@@#####@@@@@#                ##@@## #@@@
+          #@@@@@@@#     ####      ##@@@@##  ##@       ####     @@#
+           ##@@##     ###           ##@@@@@@@@##@###@@#       #@@
+                     #@#        ###    ######  @@@@@@#        @@#
+                    #@#     ## #@@@#           #####         #@#
+                  #@@#   ##@## #@@@@#                        @@
+                  @@@###@@#      #@@#                       #@#
+                 @@@@@@##        #@@#                       @#
+                 #@@##           #@@               #       #@#
+                     ###@@@@@@   ##               ##       @#
+                ###@@@@@###@@#     ###          #@#       #@#
+              #@@@@##   ####      #@#          #@#        #@
+            #@@@@#              #@@#          #@#        #@#
+           #@@@@    ###        #@@       #@@#@@          #@
+          #@@@@@@#@@##       #@@#       #@@@@#           @#
+           ##@@@@@##        #@@#       @@####   #        #   ##    ###
+           #@@##      #@@##@@@# ##@@# @#    ######      ##@@##########
+         #@@#      ##@@@#@@@@@@@@@@@###  ##@###@@#    #@@@##  #@@@######
+       #@@@     ####@@@@@@##@@###@@# ###@@#  #@@@   #@@@@           #@@#
+      #@@@@####@###@@@@@# #@@# #@@@####@@@###@@@@@###@@@@@###########@##
+      @@@@@@@@#  #@@@@@#  @@   #@@### #@###  ######  ######  ########
+      #@@@##     #####
+"))
          (longest-line (apply #'max (mapcar #'length banner))))
     (put-text-property
      (point)
@@ -32,8 +40,10 @@
                "\n"))
      'face 'doom-dashboard-banner))))
 
+
+;; BUG: emacs-mac wide toolbar
 (add-hook 'doom-after-init-hook (lambda () (tool-bar-mode 1) (tool-bar-mode 0)))
-(defvar config-directory "~/nix-systems/config")
+
 (add-to-list 'term-file-aliases '("alacritty" . "xterm"))
 (setq mouse-wheel-scroll-amount '(1)
       mouse-wheel-progressive-speed t
@@ -53,16 +63,15 @@
       calc-symbolic-mode t)
 
 ;; NOTE: auto-fill is generally faster than visual-line-mode.
-(add-hook! 'text-mode-hook #'+word-wrap-mode)
+;(add-hook! 'text-mode-hook #'+word-wrap-mode)
 ;; TODO: this doesn't work in markdown?
 ;; needs to happen before markdown mode?
 ;(remove-hook 'markdown-mode-hook #'auto-fill-mode)
-(remove-hook 'text-mode-hook #'auto-fill-mode)
+;(remove-hook 'text-mode-hook #'auto-fill-mode)
 (setq vc-follow-symlinks t)
 (setq frame-resize-pixelwise t)
 (setq confirm-kill-emacs nil)
 
-(map! :n "/" 'swiper)
 (map! :n "C-." '+eshell/toggle)
 
 (if (display-graphic-p)
@@ -104,14 +113,12 @@
                        (interactive)
                        (evil-tmux-navigate "right"))))))
 
-(map! "C-x ?" 'help-command) ;; NOTE: 'SPC h .' does the same
+;(map! "C-x ?" 'help-command) ;; NOTE: 'SPC h .' does the same
 
 (if (and IS-MAC (display-graphic-p))
          (map! "s-n" #'make-frame
                "s-w" #'delete-frame))
 
-(defun merge-init() (interactive)
-       (ediff-merge-files (expand-file-name "doom/init.el" config-directory) "~/.emacs.d/init.example.el"))
 
 ;; UI & Theme
 
@@ -122,9 +129,11 @@
 ;                  (not (string= (getenv "MACOS_DARKMODE") "true"))))
 ;    (load-theme (intern (concat (symbol-name doom-theme) "-light")) t))
 
-(load-theme 'doom-tokyo-night t)
 ;; (set-face-attribute 'default nil :foreground "#CFCFCF") ;; Slightly increase contrast
 ;; (set-face-background 'default "undefined" (selected-frame)) ;; Sets to non-exsistent colour which falls back to terminal bg
+
+(if (string= (getenv "APPEARENCE") "light")
+        (setq doom-theme 'doom-one-light))
 
 (after! doom-themes
   (setq
@@ -143,6 +152,9 @@
 
 (map! "C-x t" 'toggle-theme)
 
+(setq doom-font (font-spec :family "Iosevka")
+      doom-variable-pitch-font (font-spec :family "Iosevka Aile"))
+
 (after! doom-modeline
   (setq doom-modeline-unicode-fallback nil)
   (setq doom-modeline-percent-position nil)
@@ -153,7 +165,9 @@
 ;; NOTE: toggle with doom/toggle-line-numbers (SPC t l)
 (setq display-line-numbers-type nil)
 
-;; Packages
+(after! auth-source
+  (setq auth-sources (nreverse auth-sources)))
+
 (after! highlight-indent-guides
   (remove-hook! (prog-mode text-mode conf-mode) #'highlight-indent-guides-mode))
 
@@ -162,14 +176,11 @@
       (t (setq projectile-project-search-path '(("~/src" . 2)))))
 (setq magit-repository-directories projectile-project-search-path)
 
-(map! :leader "p ]" '+ivy/project-search)
+;; NOTE: SPC s p does this
+;(map! :leader "p ]" '+ivy/project-search)
 
 (after! spell-fu
   (set-face-attribute 'spell-fu-incorrect-face nil :inherit 'unspecified))
-
-(after! ivy
- (setq ivy-count-format "(%d/%d) ")
- (setq ivy-use-virtual-buffers t))
 
 ;; TODO: should hook to dired mode
 ;(add-hook! 'dired-mode-hook #'(lambda ()
@@ -177,40 +188,7 @@
 (after! evil-snipe
   (evil-snipe-mode -1))
 
-(after! company
-  (setq company-idle-delay nil))
-
 (after! projectile
   (projectile-register-project-type 'nixflake '("flake.nix")
                                   :compile "darwin-rebuild switch --flake .#"
                                   :run "nix develop"))
-(use-package! jsonnet-mode
-  :defer t
-  :config
-  (set-electric! 'jsonnet-mode :chars '(?\n ?: ?} ?}))
-  (setq jsonnet-use-smie t))
-
-(after! python
-  (add-hook! 'python-mode 'semantic-mode)
-  (add-hook! 'python-mode 'semantic-stickyfun-mode))
-
-(after! upload
-  (setq ssh-deploy-debug t))
-
-(use-package! copilot
-  :hook (prog-mode . copilot-mode)
-  :bind (:map copilot-completion-map
-              ("<tab>" . 'copilot-accept-completion)
-              ("TAB" . 'copilot-accept-completion)
-              ("C-TAB" . 'copilot-accept-completion-by-word)
-              ("C-<tab>" . 'copilot-accept-completion-by-word))
-  :config
-  (setq copilot-indent-offset-warning-disable t))
-
-(after! auth-source
-  (setq auth-sources (nreverse auth-sources)))
-
-(after! poetry
-  (remove-hook 'python-mode-hook #'poetry-tracking-mode))
-
-(load! "+pkm")

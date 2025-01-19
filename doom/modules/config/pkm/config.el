@@ -1,31 +1,30 @@
-;;; +pkm.el --- Personal Knowledge Management config -*- lexical-binding: t; -*-
-(setq org-directory "~/org")
+;;; config/pkm/config.el -*- lexical-binding: t; -*-
+;;; --- Personal Knowledge Management config
 
-(defun +pkm/load ()
-  (defvar +pkm/encrypt-enabled nil)
+(defun +pkm-load ()
   (setq org-roam-directory org-directory)
   (add-to-list 'auto-mode-alist '("\\.org_archive\\'" . org-mode))
   (add-to-list 'auto-mode-alist '("\\.org.gpg\\'"     . org-mode))
-  (defvar +pkm/org-ext ".org")
-  (defvar +pkm/org-archive-ext ".org_archive")
-  (remove-hook 'text-mode-hook #'vi-tilde-fringe-mode)
-  (when +pkm/encrypt-enabled (+pkm/encrypt)))
+  (defvar +pkm-org-ext ".org")
+  (defvar +pkm-org-archive-ext ".org_archive")
+  (remove-hook 'text-mode-hook #'vi-tilde-fringe-mode))
 
-(defun +pkm/encrypt()
+(defun +pkm-encrypt()
   (add-to-list 'auto-mode-alist '("\\.org.gpg\\'" . org-mode))
   (add-to-list 'auto-mode-alist '("\\.org_archive.gpg\\'" . org-mode))
   (setq epa-file-encrypt-to user-mail-address
         org-crypt-key epa-file-encrypt-to
         org-crypt-disable-auto-save t)
   (org-crypt-use-before-save-magic)
-  (setq +pkm/org-ext ".org.gpg"
-        +pkm/org-archive-ext ".org_archive.gpg")
+  (setq +pkm-org-ext ".org.gpg"
+        +pkm-org-archive-ext ".org_archive.gpg")
   (setq org-archive-location "archive.org.gpg::* From %s")
-  (unless (string-match-p "\\.gpg" org-agenda-file-regexp)
-    (setq org-agenda-file-regexp
-          (replace-regexp-in-string "\\\\\\.org" "\\\\.org\\\\(\\\\.gpg\\\\)?"
-                                    org-agenda-file-regexp))))
-(defun +pkm/org-appeareance-x ()
+  (after! org
+    (unless (string-match-p "\\.gpg" org-agenda-file-regexp)
+      (setq org-agenda-file-regexp
+            (replace-regexp-in-string "\\\\\\.org" "\\\\.org\\\\(\\\\.gpg\\\\)?"
+                                      org-agenda-file-regexp)))))
+(defun +pkm-org-appeareance-x ()
   (use-package! org-modern
       :hook ((org-mode . org-modern-mode)
              (org-agenda-finalize . org-modern-agenda))
@@ -52,19 +51,16 @@
             '((?A . (:inherit error :inverse-video t))
               (?B . (:inherit warning :inverse-video t))))
       (set-face-attribute 'org-modern-symbol nil :family "Iosevka"))
-
-  (setq doom-font (font-spec :family "Iosevka")
-        doom-variable-pitch-font (font-spec :family "Iosevka Aile"))
   (setq writeroom-fringes-outside-margins nil)
-  (add-hook! 'org-mode-hook #'writeroom-mode)
-  (load-theme 'modus-operandi t))
+  (add-hook! 'org-mode-hook #'writeroom-mode))
 
-(defun +pkm/org ()
+(defun +pkm-org ()
+  (setq display-line-numbers-type nil)
   (add-to-list 'org-modules 'org-habit)
   (add-to-list 'org-modules 'org-mouse) ;; may need to require instead
   (org-clock-persistence-insinuate)
 
-  (add-hook! 'org-mode-hook #'+word-wrap-mode)
+  ;(add-hook! 'org-mode-hook #'+word-wrap-mode)
   (remove-hook 'org-mode-hook #'auto-fill-mode)
 
   (map!
@@ -104,8 +100,8 @@
           ("HOLD" . +org-todo-onhold)
           ("CANCELLED" . +org-todo-cancel)))
 
-  (setq +org-capture-todo-file (concat "todo" +pkm/org-ext)
-        +org-capture-notes-file (concat "notes" +pkm/org-ext))
+  (setq +org-capture-todo-file (concat "todo" +pkm-org-ext)
+        +org-capture-notes-file (concat "notes" +pkm-org-ext))
   (setq org-capture-templates
         '(("t" "Personal todo" entry
            (file+headline +org-capture-todo-file "Backlog")
@@ -200,20 +196,20 @@
 
   (load! "lisp/org-notification"))
 
-(defun +pkm/org-roam ()
+(defun +pkm-org-roam ()
   ;; BUG: org-roam/pull/2141
   (map!
    :leader
    :prefix ("n" . "notes")
    (:prefix ("r" . "org-roam")
     :desc "Tag file" "t" #'org-roam-tag-add ;; NOTE: 'SPC m m o t' as well.
-    :desc "Insert node w/ template" "I" #'(lambda () (interactive) (+pkm/org-roam-tmpl-capture 'org-roam-node-insert "./roam/tmpl"))
+    :desc "Insert node w/ template" "I" #'(lambda () (interactive) (+pkm-org-roam-tmpl-capture 'org-roam-node-insert "./roam/tmpl"))
     (:prefix ("d" . "by date")
      :desc "Goto date" "d" #'(lambda () (interactive) (org-roam-dailies-goto-date nil "d"))
      :desc "Goto tomorrow" "m" #'(lambda () (interactive) (org-roam-dailies-goto-tomorrow nil "d"))
      :desc "Goto today" "n" #'(lambda () (interactive) (org-roam-dailies-goto-today "d"))
      :desc "Goto yesterday" "y" #'(lambda () (interactive) (org-roam-dailies-goto-yesterday nil "d"))
-     :desc "Goto date w/ template" "x" #'+pkm/org-roam-dailies-capture))
+     :desc "Goto date w/ template" "x" #'+pkm-org-roam-dailies-capture))
    :map org-mode-map
    :localleader
    :prefix ("m" . "org-roam")
@@ -243,7 +239,7 @@
           :target (file+head "./roam/${cxt}/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n- topics ::\n")
           :unnarrowed t)))
 
-  (defun +pkm/org-roam-tmpl-capture (fun dir)
+  (defun +pkm-org-roam-tmpl-capture (fun dir)
     (let* ((tmpl-dir (expand-file-name dir org-roam-directory))
            (files (directory-files-recursively tmpl-dir "" t))
            (org-roam-dailies-capture-templates
@@ -265,7 +261,7 @@
                               "#+title: %<%A the %e of %B %Y>\n#+filetags: %<:%Y:%B:>\n")
            :unnarrowed t)))
 
-  (defun +pkm/org-roam-dailies-capture ()
+  (defun +pkm-org-roam-dailies-capture ()
     (interactive)
     (let* ((tmpl-dir (expand-file-name "./daily/tmpl" org-roam-directory))
            (files (directory-files-recursively tmpl-dir "" t))
@@ -309,7 +305,7 @@
           org-roam-ui-update-on-save t
           org-roam-ui-open-on-start t)))
 
-(defun +pkm/org-cite ()
+(defun +pkm-org-cite ()
   (setq reftex-default-bibliography (expand-file-name "references.bib" org-directory))
   (setq org-cite-global-bibliography (list reftex-default-bibliography))
   (after! bibtex
@@ -398,7 +394,7 @@
         (apply oldfun citekey args)))
     (advice-add 'orb--new-note :around 'orb-capture-template)))
 
-(defun +pkm/org-reading ()
+(defun +pkm-org-reading ()
   (after! org-noter
     (setq org-noter-notes-search-path bibtex-completion-notes-path))
 
@@ -429,7 +425,7 @@
      'org-protocol-protocol-alist
      '("org-open-file" :protocol "open-file" :function org-protocol-open-file))))
 
-(defun +pkm/org-link-ghe ()
+(defun +pkm-org-link-ghe ()
   (org-link-set-parameters "ghe"
                            :follow (lambda (path)
                                      (let* ((org (car (split-string path "/")))
@@ -450,7 +446,7 @@
                                         ((eq backend 'md)
                                          (format "[%s](https://git/%s/%s/issues/%s)" desc org repo issue)))))))
 
-(defun +pkm/org-capture-template-jira ()
+(defun +pkm-org-capture-template-jira ()
 
   (use-package! jiralib2)
   (pushnew! org-link-abbrev-alist '("jira" .  "https://jira/browse/%s"))
@@ -507,16 +503,22 @@
                  :hook jira-capture-enrichment
                  :prepend t)))
 
-(when (file-directory-p org-directory)
-  (+pkm/load)
+
+(defun +pkm-eval-config ()
+  (setq org-directory "~/org")
+  (defvar +pkm-encrypt-enabled nil)
+  (+pkm-load)
+  (if (modulep! +encrypt)
+      (setq +pkm-encrypt-enabled 't)
+      (+pkm-encrypt))
 
   (after! org
     (when window-system
-      (+pkm/org-appeareance-x))
-    (+pkm/org))
+      (+pkm-org-appeareance-x))
+    (+pkm-org))
 
   (after! org-roam
-    (+pkm/org-roam))
+    (+pkm-org-roam))
 
-  (+pkm/org-cite)
-  (+pkm/org-reading))
+  (+pkm-org-cite)
+  (+pkm-org-reading))
