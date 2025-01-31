@@ -19,6 +19,34 @@
   (setq +pkm-org-ext ".org.gpg"
         +pkm-org-archive-ext ".org_archive.gpg")
   (setq org-archive-location "archive.org.gpg::* From %s")
+  (defun +pkm/open-all-project-files ()
+    "Open all project files"
+    (interactive)
+    (let ((project-root (doom-modeline--project-root)))
+      (when project-root
+        (do-list (file (projectile-current-projhect-files))
+                 (when (string-suffix-p +pkm-org-ext file)
+                   (find-file-noselect (expand-file-name file project-root)))))))
+
+  (defun +pkm/open-all-project-files-alt ()
+    "Open all project files"
+    (interactive)
+    (let ((project-root (doom-modeline--project-root)))
+          (when project-root
+            (let ((files (directory-files-recursively project-root +pkm-org-ext)))
+              (when files
+                (dolist (file files)
+                  (find-file-noselect file)))))))
+
+  (cond ((modulep! :completion ivy)
+         (advice-add 'swiper-all :before #'pkm/open-all-project-files-alt))
+        ((modulep! :completion vertico)
+         (map! :leader
+               :prefix ("s" . "search")
+               :desc "Search all open buffers" "B"
+               (cmd! (progn
+                       (+pkm/open-all-project-files-alt)
+                       (consult-line-multi 'all-buffers))))))
   (after! org
     (unless (string-match-p "\\.gpg" org-agenda-file-regexp)
       (setq org-agenda-file-regexp

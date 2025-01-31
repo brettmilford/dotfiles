@@ -132,8 +132,13 @@
 ;; (set-face-attribute 'default nil :foreground "#CFCFCF") ;; Slightly increase contrast
 ;; (set-face-background 'default "undefined" (selected-frame)) ;; Sets to non-exsistent colour which falls back to terminal bg
 
-(if (string= (getenv "APPEARENCE") "light")
-        (setq doom-theme 'doom-one-light))
+;; Theme
+;; Set theme on startup
+(with-temp-buffer
+  (call-process "defaults" nil t nil "read" "-g" "AppleInterfaceStyle")
+  (if (string-match-p "Dark" (buffer-string))
+      (setq doom-theme 'doom-one)
+      (setq doom-theme 'doom-one-light)))
 
 (after! doom-themes
   (setq
@@ -144,13 +149,22 @@
   "Toggle light/dark of the current theme."
   (interactive)
   (if (string-suffix-p "-light" (symbol-name doom-theme))
-      (load-theme (intern (string-remove-suffix "-light" (symbol-name doom-theme))) t)
-    (if (string-suffix-p "-dark" (symbol-name doom-theme))
-      (load-theme (intern (concat (string-remove-suffix "-dark" (symbol-name doom-theme)) "-light")) t)
-      (load-theme (intern (concat (symbol-name doom-theme) "-light")) t)))
-  (doom/reload-theme))
+      (progn
+        (disable-theme doom-theme)
+        (setq doom-theme (intern (string-remove-suffix "-light" (symbol-name doom-theme))))
+        (load-theme doom-theme t))
+      (if (string-suffix-p "-dark" (symbol-name doom-theme))
+          (progn
+            (disable-theme doom-theme)
+            (setq doom-theme (intern (concat (string-remove-suffix "-dark" (symbol-name doom-theme)) "-light")))
+            (load-theme doom-theme t))
+        (disable-theme doom-theme)
+        (setq doom-theme (intern (concat (symbol-name doom-theme) "-light")))
+        (load-theme doom-theme t))))
 
 (map! "C-x t" 'toggle-theme)
+;; NOTE: Requires emacs-mac
+(add-hook 'mac-effective-appearance-change-hook 'toggle-theme)
 
 (setq doom-font (font-spec :family "Iosevka")
       doom-variable-pitch-font (font-spec :family "Iosevka Aile"))
@@ -167,6 +181,9 @@
 
 (after! auth-source
   (setq auth-sources (nreverse auth-sources)))
+
+(use-package! pinentry
+  :init (pinentry-start))
 
 (after! highlight-indent-guides
   (remove-hook! (prog-mode text-mode conf-mode) #'highlight-indent-guides-mode))
