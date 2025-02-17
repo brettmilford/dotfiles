@@ -59,6 +59,7 @@
 
        :config
        pkm
+       private
        (default +bindings +smartparens))
 
 (add-to-list 'default-frame-alist '(width . 100))
