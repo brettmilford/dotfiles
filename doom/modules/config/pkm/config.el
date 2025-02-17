@@ -536,7 +536,7 @@
   (setq org-directory "~/org")
   (defvar +pkm-encrypt-enabled nil)
   (+pkm-load)
-  (if (modulep! +encrypt)
+  (when (modulep! +encrypt)
       (setq +pkm-encrypt-enabled 't)
       (+pkm-encrypt))
 
