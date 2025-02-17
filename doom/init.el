@@ -38,6 +38,7 @@
        (eval +overlay)
        lookup
        magit
+       direnv
 
        :os
        (:if (featurep :system 'macos) macos)
