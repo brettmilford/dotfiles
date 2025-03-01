@@ -13,4 +13,4 @@
 (package! anki-editor)
 (package! org-mode-incremental-reading
   :recipe (:host github :repo "vascoferreira25/org-mode-incremental-reading"))
-(package! jiralib2)
+(package! mermaid-mode) ;; markdown diagrams
