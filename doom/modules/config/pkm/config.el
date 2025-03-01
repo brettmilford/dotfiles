@@ -541,6 +541,9 @@
       (+pkm-encrypt))
 
   (after! org
+    (when (modulep! +jira)
+      (+pkm-org-link-ghe)
+      (+pkm-org-capture-template-jira))
     (when window-system
       (+pkm-org-appeareance-x))
     (+pkm-org))
