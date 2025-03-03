@@ -134,11 +134,12 @@
 
 ;; Theme
 ;; Set theme on startup
+(when (executable-find "defaults")
 (with-temp-buffer
   (call-process "defaults" nil t nil "read" "-g" "AppleInterfaceStyle")
   (if (string-match-p "Dark" (buffer-string))
       (setq doom-theme 'doom-one)
-      (setq doom-theme 'doom-one-light)))
+      (setq doom-theme 'doom-one-light))))
 
 (after! doom-themes
   (setq
@@ -209,3 +210,34 @@
   (projectile-register-project-type 'nixflake '("flake.nix")
                                   :compile "darwin-rebuild switch --flake .#"
                                   :run "nix develop"))
+
+(use-package! gptel
+  :config
+  (defun +gptel-popup ()
+    "Launch gptel in a new frame."
+    (interactive)
+    (let ((new-frame (make-frame '((width . 80)(height . 20))))
+          (buffer-name (generate-new-buffer-name "*GPTel*")))
+      (select-frame new-frame)
+      (delete-other-windows)
+      (gptel buffer-name nil nil nil)
+      (switch-to-buffer buffer-name)
+      (when (bound-and-true-p evil-mode)
+        (evil-insert-state))))
+
+  (map! :g "M-SPC" #'+gptel-popup)
+
+  (setq gptel-model 'llm
+        gptel-log-level 'debug
+        gptel-default-mode 'org-mode
+        gptel-org-branching-context 't)
+
+  (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "@user\n")
+  (setf (alist-get 'org-mode gptel-response-prefix-alist) "@assistant\n")
+
+  (setq gptel-backend
+    (gptel-make-openai "llama-cpp"
+     :stream t
+     :protocol "http"
+     :host "localhost:8080"
+     :models '(llm))))
