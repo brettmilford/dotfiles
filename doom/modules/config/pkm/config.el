@@ -514,7 +514,7 @@
            :keys "d"
            :templates '(("d" "default" plain "* {title} Notes"
                          :target (file+head "./jira/${slug}.org"
-                                            "#+title: [[jira:${title}][${title]]\n")))
+                                            "#+title: [[jira:${title}][${title}]]\n")))
            :props (append
                    (list :link-description (format "%s Notes" .key)
                          :jump-to-captured nil
