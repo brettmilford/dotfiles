@@ -229,15 +229,31 @@
 
   (setq gptel-model 'llm
         gptel-log-level 'debug
+        gptel-expert-commands 't
         gptel-default-mode 'org-mode
-        gptel-org-branching-context 't)
+        gptel-org-branching-context 't
+        gptel-max-tokens 1024
+        gptel-temperature 0.5)
 
-  (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "@user\n")
+  (let ((directory "~/org/llm"))
+    (dolist (file (directory-files directory nil nil))
+      (unless (file-directory-p file)
+        (with-temp-buffer
+          (insert-file-contents (concat directory "/" file))
+          (let ((content (buffer-string))
+                (filename (file-name-sans-extension file)))
+            (push (cons (intern filename) content) gptel-directives))))))
+
   (setf (alist-get 'org-mode gptel-response-prefix-alist) "@assistant\n")
+
+  (gptel-make-ollama "ollama"
+    :stream t
+    :models '(phi-4:latest
+              deepseek-r1:32b))
 
   (setq gptel-backend
     (gptel-make-openai "llama-cpp"
      :stream t
      :protocol "http"
      :host "localhost:8080"
-     :models '(llm))))
+     :models '((llm))))
