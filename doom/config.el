@@ -256,4 +256,4 @@
      :stream t
      :protocol "http"
      :host "localhost:8080"
-     :models '((llm))))
+     :models '(llm))))
