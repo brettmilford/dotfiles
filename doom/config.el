@@ -246,11 +246,6 @@
 
   (setf (alist-get 'org-mode gptel-response-prefix-alist) "@assistant\n")
 
-  (gptel-make-ollama "ollama"
-    :stream t
-    :models '(phi-4:latest
-              deepseek-r1:32b))
-
   (setq gptel-backend
     (gptel-make-openai "llama-cpp"
      :stream t
