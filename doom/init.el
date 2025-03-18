@@ -34,7 +34,7 @@
        spell
 
        :tools
-       biblio
+       (:if (modulep! :config pkm biblio))
        (eval +overlay)
        lookup
        magit
@@ -42,20 +42,27 @@
 
        :os
        (:if (featurep :system 'macos) macos)
+       (tty +osc)
 
        :lang
+       nix
        emacs-lisp
        markdown
-       (org +roam2
-            +noter
-            +pandoc
-            +present)
-       latex
+       (:if (modulep! :config pkm)
+        (org +roam2
+             +noter
+             +pandoc
+             +present)
+        latex)
        sh
        (rest +jq)
        yaml
        json
        data
+
+       :term
+       eshell
+       ;vterm
 
        :config
        pkm

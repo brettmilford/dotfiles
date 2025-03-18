@@ -119,6 +119,19 @@
          (map! "s-n" #'make-frame
                "s-w" #'delete-frame))
 
+(defvar +c/zoomed nil)
+
+(defun +c/toggle-zoom ()
+  (interactive)
+  (cond (+c/zoomed
+         (winner-undo)
+         (setq +c/zoomed nil))
+        ((not +c/zoomed)
+         (doom/window-maximize-buffer)
+         (setq +c/zoomed 't))))
+
+(map! :map evil-window-map
+      :desc "Zoom window" "z" #'+c/toggle-zoom)
 
 ;; UI & Theme
 
@@ -212,7 +225,14 @@
                                   :run "nix develop"))
 
 (use-package! gptel
+  :init
+  (setq evil-collection-gptel-want-ret-to-send nil
+        evil-collection-gptel-want-shift-ret-menu nil)
   :config
+
+  (setq gptel-log-level 'info
+        gptel-default-mode 'org-mode)
+
   (defun +gptel-popup ()
     "Launch gptel in a new frame."
     (interactive)
@@ -227,15 +247,32 @@
 
   (map! :g "M-SPC" #'+gptel-popup)
 
-  (setq gptel-model 'llm
-        gptel-log-level 'debug
-        gptel-expert-commands 't
-        gptel-default-mode 'org-mode
-        gptel-org-branching-context 't
-        gptel-max-tokens 1024
-        gptel-temperature 0.5)
+  (defun +gptel-toggle-branching ()
+    "Toggle settings for org-branching-context"
+    (interactive)
+    (cond
+     (gptel-org-branching-context
+      (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "*** ")
+      (setf (alist-get 'org-mode gptel-response-prefix-alist) "")
+      (setq gptel-org-convert-response nil
+            gptel-org-branching-context nil))
+     ((not gptel-org-branching-context)
+      (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "@user\n")
+      (setf (alist-get 'org-mode gptel-response-prefix-alist) "@assistant\n")
+      (setq gptel-org-convert-response nil
+            gptel-org-branching-context 't))))
 
-  (let ((directory "~/org/llm"))
+  (defun +gptel-ctx-ignore-think()
+  "Ignore <think>...</think> regions for context."
+  (interactive)
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward "<think>\\(.*?\\)</think>" nil t)
+      (let ((begin (match-beginning 0))  ;; Match both the opening and closing tags
+            (end (match-end 0)))
+        (add-text-properties begin end '(gptel ignore front-sticky (gptel)))))))
+
+  (let ((directory "~/org/src/llm_system_prompts"))
     (dolist (file (directory-files directory nil nil))
       (unless (file-directory-p file)
         (with-temp-buffer
@@ -244,7 +281,11 @@
                 (filename (file-name-sans-extension file)))
             (push (cons (intern filename) content) gptel-directives))))))
 
-  (setf (alist-get 'org-mode gptel-response-prefix-alist) "@assistant\n")
+  (setq gptel-model 'llm
+        gptel-max-tokens nil
+        gptel-temperature nil ;; should get temp from model config
+        gptel-expert-commands nil ;; note if gptel-temperature is nil this breaks the transient
+        gptel-include-reasoning 'ignore)
 
   (setq gptel-backend
     (gptel-make-openai "llama-cpp"
