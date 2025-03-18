@@ -16,6 +16,7 @@
         org-crypt-key epa-file-encrypt-to
         org-crypt-disable-auto-save t)
   (org-crypt-use-before-save-magic)
+  (setq org-tags-exclude-from-inheritance '("crypt"))
   (setq +pkm-org-ext ".org.gpg"
         +pkm-org-archive-ext ".org_archive.gpg")
   (setq org-archive-location "archive.org.gpg::* From %s")
@@ -100,14 +101,29 @@
    :map org-mode-map
    :localleader
      "TAB" #'org-insert-structure-template
+     "y" #'+pkm/org-yank-block-content
      :prefix ("c" . "clock")
-       :desc "Capture clocked" "x" #'org-capture-clocked)
+       :desc "Capture clocked" "x" #'+pkm/org-capture-clocked)
 
-  (defun org-capture-clocked ()
+  (defun +pkm/org-capture-clocked ()
     (interactive)
     (let ((org-capture-templates '(("c" "clocked" entry (clock) "* %?\n%i\n%a"))))
       (+org-capture/open-frame nil "c")))
 
+  (defun +pkm/org-yank-block-content ()
+    "Copy everything in #+ blocks"
+    (interactive)
+    (save-restriction
+        (org-narrow-to-block)
+        (let ((content (buffer-substring-no-properties (point-min) (point-max))))
+          (with-temp-buffer
+            (insert content)
+            (goto-char (point-min))
+            (while (re-search-forward "^#\\+.*\n?" nil t)
+              (replace-match ""))
+            (kill-ring-save (point-min) (point-max))))
+          (widen))
+    (message "Block yanked."))
   ;(setq org-capture-templates
   ;      '(("t" "Todo" entry
   ;         (file+headline org-default-notes-file "Inbox")
@@ -232,6 +248,7 @@
    (:prefix ("r" . "org-roam")
     :desc "Tag file" "t" #'org-roam-tag-add ;; NOTE: 'SPC m m o t' as well.
     :desc "Insert node w/ template" "I" #'(lambda () (interactive) (+pkm-org-roam-tmpl-capture 'org-roam-node-insert "./roam/tmpl"))
+    :desc "Find node w/ template" "N" #'(lambda () (interactive) (+pkm-org-roam-tmpl-capture 'org-roam-node-find "./roam/tmpl"))
     (:prefix ("d" . "by date")
      :desc "Goto date" "d" #'(lambda () (interactive) (org-roam-dailies-goto-date nil "d"))
      :desc "Goto tomorrow" "m" #'(lambda () (interactive) (org-roam-dailies-goto-tomorrow nil "d"))
