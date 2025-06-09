@@ -209,6 +209,8 @@
 
 ;; NOTE: SPC s p does this
 ;(map! :leader "p ]" '+ivy/project-search)
+(after! evil
+  (map! :nv "/" #'+default/search-buffer))
 
 (after! spell-fu
   (set-face-attribute 'spell-fu-incorrect-face nil :inherit 'unspecified))
@@ -224,72 +226,5 @@
                                   :compile "darwin-rebuild switch --flake .#"
                                   :run "nix develop"))
 
-(use-package! gptel
-  :init
-  (setq evil-collection-gptel-want-ret-to-send nil
-        evil-collection-gptel-want-shift-ret-menu nil)
-  :config
-
-  (setq gptel-log-level 'info
-        gptel-default-mode 'org-mode)
-
-  (defun +gptel-popup ()
-    "Launch gptel in a new frame."
-    (interactive)
-    (let ((new-frame (make-frame '((width . 80)(height . 20))))
-          (buffer-name (generate-new-buffer-name "*GPTel*")))
-      (select-frame new-frame)
-      (delete-other-windows)
-      (gptel buffer-name nil nil nil)
-      (switch-to-buffer buffer-name)
-      (when (bound-and-true-p evil-mode)
-        (evil-insert-state))))
-
-  (map! :g "M-SPC" #'+gptel-popup)
-
-  (defun +gptel-toggle-branching ()
-    "Toggle settings for org-branching-context"
-    (interactive)
-    (cond
-     (gptel-org-branching-context
-      (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "*** ")
-      (setf (alist-get 'org-mode gptel-response-prefix-alist) "")
-      (setq gptel-org-convert-response nil
-            gptel-org-branching-context nil))
-     ((not gptel-org-branching-context)
-      (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "@user\n")
-      (setf (alist-get 'org-mode gptel-response-prefix-alist) "@assistant\n")
-      (setq gptel-org-convert-response nil
-            gptel-org-branching-context 't))))
-
-  (defun +gptel-ctx-ignore-think()
-  "Ignore <think>...</think> regions for context."
-  (interactive)
-  (save-excursion
-    (goto-char (point-min))
-    (while (re-search-forward "<think>\\(.*?\\)</think>" nil t)
-      (let ((begin (match-beginning 0))  ;; Match both the opening and closing tags
-            (end (match-end 0)))
-        (add-text-properties begin end '(gptel ignore front-sticky (gptel)))))))
-
-  (let ((directory "~/org/src/llm_system_prompts"))
-    (dolist (file (directory-files directory nil nil))
-      (unless (file-directory-p file)
-        (with-temp-buffer
-          (insert-file-contents (concat directory "/" file))
-          (let ((content (buffer-string))
-                (filename (file-name-sans-extension file)))
-            (push (cons (intern filename) content) gptel-directives))))))
-
-  (setq gptel-model 'llm
-        gptel-max-tokens nil
-        gptel-temperature nil ;; should get temp from model config
-        gptel-expert-commands nil ;; note if gptel-temperature is nil this breaks the transient
-        gptel-include-reasoning 'ignore)
-
-  (setq gptel-backend
-    (gptel-make-openai "llama-cpp"
-     :stream t
-     :protocol "http"
-     :host "localhost:8080"
-     :models '(llm))))
+(after! clipetty
+  (setq clipetty-tmux-ssh-tty "tmux show-environment -g SSH_TTY"))

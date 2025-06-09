@@ -1,13 +1,14 @@
 ;;; init.el -*- lexical-binding: t; -*-
 
 (doom! :completion
-       (corfu +orderless)
+       ;;(corfu +orderless)
+       company
        vertico
 
        :ui
        doom
        doom-dashboard
-       hl-todo
+       hl-todo ;; TODO/HACK/FIXME/REVIEW/NOTE/DEPRECATED/BUG/XXX
        modeline
        ophints
        (popup +defaults)
@@ -34,39 +35,49 @@
        spell
 
        :tools
-       (:if (modulep! :config pkm biblio))
+       biblio
        (eval +overlay)
        lookup
        magit
        direnv
+       lsp
+       tree-sitter
 
        :os
        (:if (featurep :system 'macos) macos)
        (tty +osc)
 
        :lang
-       nix
        emacs-lisp
-       markdown
-       (:if (modulep! :config pkm)
-        (org +roam2
-             +noter
-             +pandoc
-             +present)
-        latex)
        sh
+       markdown
+       (org +roam2
+            +noter
+            +pandoc
+            +present)
+       latex
        (rest +jq)
        yaml
        json
        data
+       nix
+       (cc +lsp
+           +tree-sitter)
+       (go +lsp
+           +tree-sitter)
+       (rust +lsp
+             +tree-sitter)
+       (zig +lsp
+            +tree-sitter)
 
        :term
        eshell
        ;vterm
 
        :config
-       pkm
        private
+       assistant
+       pkm
        (default +bindings +smartparens))
 
 (add-to-list 'default-frame-alist '(width . 100))

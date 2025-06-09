@@ -7,13 +7,21 @@
   (add-to-list 'auto-mode-alist '("\\.org.gpg\\'"     . org-mode))
   (defvar +pkm-org-ext ".org")
   (defvar +pkm-org-archive-ext ".org_archive")
-  (remove-hook 'text-mode-hook #'vi-tilde-fringe-mode))
+  (remove-hook 'text-mode-hook #'vi-tilde-fringe-mode)
+  (require 'org-crypt)
+  (setq epa-file-encrypt-to `(,user-mail-address)
+        epa-file-select-keys 1
+        org-crypt-key user-mail-address
+        org-crypt-disable-auto-save t)
+  (org-crypt-use-before-save-magic)
+  (setq org-tags-exclude-from-inheritance '("crypt")))
 
 (defun +pkm-encrypt()
   (add-to-list 'auto-mode-alist '("\\.org.gpg\\'" . org-mode))
   (add-to-list 'auto-mode-alist '("\\.org_archive.gpg\\'" . org-mode))
-  (setq epa-file-encrypt-to user-mail-address
-        org-crypt-key epa-file-encrypt-to
+  (setq epa-file-encrypt-to `(,user-mail-address)
+        epa-file-select-keys 1
+        org-crypt-key user-mail-address
         org-crypt-disable-auto-save t)
   (org-crypt-use-before-save-magic)
   (setq org-tags-exclude-from-inheritance '("crypt"))
@@ -279,9 +287,9 @@
         )
 
   (setq org-roam-capture-templates
-        '(("d" "default" plain
+        `(("d" "default" plain
           "* ${title}\n%?"
-          :target (file+head "./roam/${cxt}/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n- topics ::\n")
+          :target (file+head ,(concat "./roam/${cxt}/%<%Y%m%d%H%M%S>-${slug}" +pkm-org-ext) "#+title: ${title}\n- topics ::\n")
           :unnarrowed t)))
 
   (defun +pkm-org-roam-tmpl-capture (fun dir)
@@ -296,13 +304,13 @@
                      `(,key ,desc)
                      `(,key ,desc plain
                        (file ,file)
-                       :if-new (file "./roam/%<%Y%m%d%H%M%S>-${slug}.org")))))
+                       :if-new (file ,(concat "./roam/%<%Y%m%d%H%M%S>-${slug}" +pkm-org-ext))))))
                files)))
     (funcall fun nil :templates org-roam-dailies-capture-templates)))
 
   (setq org-roam-dailies-capture-templates
-        '(("d" "default" entry "* %? :crypt:\n%U\n"
-           :if-new (file+head "%<%Y-%m-%d>.org"
+        `(("d" "default" entry "* %? :crypt:\n%U\n"
+           :if-new (file+head ,(concat "%<%Y-%m-%d>" +pkm-org-ext)
                               "#+title: %<%A the %e of %B %Y>\n#+filetags: %<:%Y:%B:>\n")
            :unnarrowed t)))
 
@@ -319,7 +327,7 @@
                      `(,key ,desc)
                      `(,key ,desc entry
                        (file ,file)
-                       :if-new (file+head "%<%Y-%m-%d>.org"
+                       :if-new (file+head ,(concat "%<%Y-%m-%d>" +pkm-org-ext)
                                           "#+title: %<%A the %e of %B %Y>\n#+filetags: %<:%Y:%B:>\n\n")))))
                files)))
       (org-roam-dailies-capture-date)))
@@ -529,8 +537,8 @@
           (org-roam-capture-
            :node node
            :keys "d"
-           :templates '(("d" "default" plain "* {title} Notes"
-                         :target (file+head "./jira/${slug}.org"
+           :templates `(("d" "default" plain "* {title} Notes"
+                         :target (file+head ,(concat "./jira/${slug}.org" +pkm-org-ext)
                                             "#+title: [[jira:${title}][${title}]]\n")))
            :props (append
                    (list :link-description (format "%s Notes" .key)
@@ -558,12 +566,12 @@
       (+pkm-encrypt))
 
   (after! org
+    (+pkm-org)
     (when (modulep! +jira)
       (+pkm-org-link-ghe)
       (+pkm-org-capture-template-jira))
     (when window-system
-      (+pkm-org-appeareance-x))
-    (+pkm-org))
+      (+pkm-org-appeareance-x)))
 
   (after! org-roam
     (+pkm-org-roam))
