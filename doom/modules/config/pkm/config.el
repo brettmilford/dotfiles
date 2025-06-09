@@ -228,7 +228,7 @@
     "%bib %b"
     "%latex -interaction nonstopmode -output-directory %o %f"
     "%latex -interaction nonstopmode -output-directory %o %f")
-  org-export-date-timestamp-format "%B %e, %Y"
+  org-export-date-timestamp-format "%B %-e, %Y"
   org-log-into-drawer t
   org-table-duration-custom-format 'minutes
   org-clock-persist t
@@ -311,7 +311,7 @@
   (setq org-roam-dailies-capture-templates
         `(("d" "default" entry "* %? :crypt:\n%U\n"
            :if-new (file+head ,(concat "%<%Y-%m-%d>" +pkm-org-ext)
-                              "#+title: %<%A the %e of %B %Y>\n#+filetags: %<:%Y:%B:>\n")
+                              "#+title: %<%A the %-e of %B %Y>\n#+filetags: %<:%Y:%B:>\n")
            :unnarrowed t)))
 
   (defun +pkm-org-roam-dailies-capture ()
@@ -328,7 +328,7 @@
                      `(,key ,desc entry
                        (file ,file)
                        :if-new (file+head ,(concat "%<%Y-%m-%d>" +pkm-org-ext)
-                                          "#+title: %<%A the %e of %B %Y>\n#+filetags: %<:%Y:%B:>\n\n")))))
+                                          "#+title: %<%A the %-e of %B %Y>\n#+filetags: %<:%Y:%B:>\n\n")))))
                files)))
       (org-roam-dailies-capture-date)))
 
