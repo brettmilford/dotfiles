@@ -1,11 +1,13 @@
 ;;; config/assistant/config.el -*- lexical-binding: t; -*-
 
 (defun +assistant-eval-config ()
+
 (use-package! gptel
   :init
   (setq evil-collection-gptel-want-ret-to-send nil
-        evil-collection-gptel-want-shift-ret-menu nil)
-  :config
+        evil-collection-gptel-want-shift-ret-menu nil))
+
+(after! gptel
   (setq gptel-log-level 'debug
         gptel-default-mode 'org-mode)
 
@@ -149,5 +151,9 @@
 
    (gptel-make-anthropic "Claude" :stream t :key gptel-api-key))
 
+  (after! gptel-magit
+    (setq gptel-magit-commit-prompt
+          (concat gptel-magit-prompt-zed
+                  "\n- IMPORTANT: The first line is limited to 50 characters and the second line must be empty.")))
   ;; (setf (gptel-get-backend "ChatGPT") nil)
   (message "config/assistant/config.el was evaluated"))
