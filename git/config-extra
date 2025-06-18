@@ -1,0 +1,21 @@
+[user]
+    name = Brett Milford
+    email = brettmilford@gmail.com
+
+[gpg]
+	program = "gpg2"
+
+[tag]
+	gpgSign = true
+
+[commit]
+	gpgSign = true
+
+[gitreview]
+	username = "brett"
+
+[gitubuntu]
+	lpuser = "brettmilford"
+
+[url "git+ssh://brettmilford@git.launchpad.net/"]
+	insteadOf = "lp:"

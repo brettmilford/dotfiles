@@ -1,7 +1,10 @@
+[include]
+	path = config-extra
+
 [alias]
-	a = "add -p"
-	bD = "branch -D"
-	ba = "branch -a"
+    a = "add -p"
+    bD = "branch -D"
+    ba = "branch -a"
 	bd = "branch -d"
 	bdm = "!git branch --merged | grep -v '*' | xargs -n 1 git branch -d"
 	c = "commit"
@@ -40,9 +43,6 @@
 	interactive = "auto"
 	status = "auto"
 
-[commit]
-	gpgSign = true
-
 [core]
 	excludesfile = "~/.config/git/ignore"
 
@@ -55,26 +55,10 @@
 	required = true
 	smudge = "git-lfs smudge -- %f"
 
-[gitreview]
-	username = "brett"
-
-[gitubuntu]
-	lpuser = "brettmilford"
-
-[gpg]
-	program = "gpg2"
-
 [init]
-	defaultBranch = "devel"
+	defaultBranch = "main"
 
 [pull]
 	rebase = false
-
-[tag]
-	gpgSign = true
-
-[url "git+ssh://brettmilford@git.launchpad.net/"]
-	insteadOf = "lp:"
-
 [push]
 	autoSetupRemote = true
