@@ -151,8 +151,8 @@
 (with-temp-buffer
   (call-process "defaults" nil t nil "read" "-g" "AppleInterfaceStyle")
   (if (string-match-p "Dark" (buffer-string))
-      (setq doom-theme 'doom-one)
-      (setq doom-theme 'doom-one-light))))
+      (setq doom-theme 'modus-vivendi)
+      (setq doom-theme 'modus-operandi))))
 
 (after! doom-themes
   (setq
@@ -162,19 +162,29 @@
 (defun toggle-theme ()
   "Toggle light/dark of the current theme."
   (interactive)
-  (if (string-suffix-p "-light" (symbol-name doom-theme))
-      (progn
-        (disable-theme doom-theme)
-        (setq doom-theme (intern (string-remove-suffix "-light" (symbol-name doom-theme))))
-        (load-theme doom-theme t))
-      (if (string-suffix-p "-dark" (symbol-name doom-theme))
-          (progn
-            (disable-theme doom-theme)
-            (setq doom-theme (intern (concat (string-remove-suffix "-dark" (symbol-name doom-theme)) "-light")))
-            (load-theme doom-theme t))
-        (disable-theme doom-theme)
-        (setq doom-theme (intern (concat (symbol-name doom-theme) "-light")))
-        (load-theme doom-theme t))))
+  ;; Handle modus themes
+  (cond ((eq doom-theme 'modus-vivendi)
+         (disable-theme doom-theme)
+         (setq doom-theme 'modus-operandi)
+         (load-theme doom-theme t))
+        ((eq doom-theme 'modus-operandi)
+         (disable-theme doom-theme)
+         (setq doom-theme 'modus-vivendi)
+         (load-theme doom-theme t))
+        ;; Handle other themes with -light/-dark suffixes
+        ((string-suffix-p "-light" (symbol-name doom-theme))
+         (disable-theme doom-theme)
+         (setq doom-theme (intern (string-remove-suffix "-light" (symbol-name doom-theme))))
+         (load-theme doom-theme t))
+        ((string-suffix-p "-dark" (symbol-name doom-theme))
+         (disable-theme doom-theme)
+         (setq doom-theme (intern (concat (string-remove-suffix "-dark" (symbol-name doom-theme)) "-light")))
+         (load-theme doom-theme t))
+        ;; Default case: add -light suffix
+        (t
+         (disable-theme doom-theme)
+         (setq doom-theme (intern (concat (symbol-name doom-theme) "-light")))
+         (load-theme doom-theme t))))
 
 (map! "C-x t" 'toggle-theme)
 ;; NOTE: Requires emacs-mac
