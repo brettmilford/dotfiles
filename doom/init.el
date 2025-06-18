@@ -40,6 +40,7 @@
        lookup
        magit
        direnv
+       llm
        lsp
        tree-sitter
 
