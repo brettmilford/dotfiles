@@ -175,20 +175,26 @@
 
           ("o" "Centralized templates for projects")
           ("ot" "Project todo" entry
-           (function +org-capture-central-project-todo-file)
+           (function +pkm/org-capture-central-project-file)
            "* TODO %?\n%i\n %a"
            :heading "Backlog"
            :prepend nil)
           ("on" "Project notes" entry
-           (function +org-capture-central-project-notes-file)
+           (function +pkm/org-capture-central-project-file)
            "* %U %?\n %i\n %a"
            :heading "Notes"
            :prepend t)
           ("oc" "Project changelog" entry
-           (function +org-capture-central-project-changelog-file)
+           (function +pkm/org-capture-central-project-file)
            "* %U %?\n %i\n %a"
            :heading "Changelog"
            :prepend t)))
+
+(defun +pkm/org-capture-central-project-file ()
+  "TODO"
+  (let ((project-name (projectile-project-name)))
+    (+org--capture-central-file
+      (concat "projects/" project-name ".org") project-name)))
 
   (let ((project-dir (expand-file-name "projects/" org-directory)))
     (if (file-directory-p project-dir)
