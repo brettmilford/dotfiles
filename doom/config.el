@@ -238,3 +238,33 @@
 
 (after! clipetty
   (setq clipetty-tmux-ssh-tty "tmux show-environment -g SSH_TTY"))
+
+;; TRAMP performance improvements
+(setq remote-file-name-inhibit-locks t
+      tramp-use-scp-direct-remote-copying t
+      remote-file-name-inhibit-auto-save-visited t)
+
+(setq tramp-copy-size-limit (* 1024 1024) ;; 1MB
+      tramp-verbose 2)
+
+(after! tramp
+  (with-eval-after-load 'compile
+    (remove-hook 'compilation-mode-hook #'tramp-compile-disable-ssh-controlmaster-options)))
+
+
+(after! magit
+  (defun $magit-auto-revert-not-remote (orig-fun &rest args)
+    (unless (and buffer-file-name (file-remote-p buffer-file-name))
+      (apply orig-fun args)))
+
+  ;; Don't auto-revert remote files
+  (advice-add 'magit-turn-on-auto-revert-mode-if-desired
+              :around
+              #'$magit-auto-revert-not-remote)
+
+  ;; don't show the diff by default in the commit buffer. Use `C-c C-d' to display it
+  (setq magit-commit-show-diff nil)
+  ;; don't show git variables in magit branch
+  (setq magit-branch-direct-configure nil)
+  ;; don't automatically refresh the status buffer after running a git command
+  (setq magit-refresh-status-buffer nil))

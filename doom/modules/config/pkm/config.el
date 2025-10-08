@@ -92,6 +92,10 @@
   (add-hook! 'org-mode-hook #'writeroom-mode))
 
 (defun +pkm-org ()
+  ;; Stop this from overriding my global C-k binding
+  (map! :after org
+        :map org-mode-map
+        :n "C-k" nil)
   (setq display-line-numbers-type nil)
   (add-to-list 'org-modules 'org-habit)
   (add-to-list 'org-modules 'org-mouse) ;; may need to require instead
@@ -282,6 +286,9 @@
   ;; makes id links work, if org-mode hasn't cached them
   ;; TODO: kills startup performance.
   ;; (org-id-update-id-locations (org-roam-list-files) 't)
+
+  ;; Exclude archive notes from org-roam parsing
+  (add-to-list 'org-roam-file-exclude-regexp (concat org-directory "/archive/"))
 
   (setq org-roam-mode-sections
         '((org-roam-backlinks-section :unique t)
@@ -506,8 +513,6 @@
                                          (format "[%s](https://git/%s/%s/issues/%s)" desc org repo issue)))))))
 
 (defun +pkm-org-capture-template-jira ()
-
-  (use-package! jiralib2)
   (pushnew! org-link-abbrev-alist '("jira" .  "https://jira/browse/%s"))
 
   (defun jira-capture-enrichment ()

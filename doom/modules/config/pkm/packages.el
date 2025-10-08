@@ -15,3 +15,4 @@
   :recipe (:host github :repo "vascoferreira25/org-mode-incremental-reading"))
 (package! mermaid-mode) ;; markdown diagrams
 (package! sqlite3)
+(package! jiralib2)
