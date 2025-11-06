@@ -89,6 +89,7 @@
               (?B . (:inherit warning :inverse-video t))))
       (set-face-attribute 'org-modern-symbol nil :family "Iosevka"))
   (setq writeroom-fringes-outside-margins nil)
+  (setq +zen-text-scale 0)
   (add-hook! 'org-mode-hook #'writeroom-mode))
 
 (defun +pkm-org ()

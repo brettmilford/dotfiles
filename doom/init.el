@@ -73,7 +73,7 @@
 
        :term
        eshell
-       ;vterm
+       vterm
 
        :config
        private

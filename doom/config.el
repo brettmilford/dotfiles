@@ -190,8 +190,13 @@
 ;; NOTE: Requires emacs-mac
 (add-hook 'mac-effective-appearance-change-hook 'toggle-theme)
 
+(setq-default line-spacing 0.1)
 (setq doom-font (font-spec :family "Iosevka")
-      doom-variable-pitch-font (font-spec :family "Iosevka Aile"))
+      doom-serif-font (font-spec :family "Iosevka Slab")
+      doom-variable-pitch-font (font-spec :family "Iosevka Etoile"))
+
+(after! vterm
+  (evil-set-initial-state 'vterm-mode 'emacs))
 
 (after! doom-modeline
   (setq doom-modeline-unicode-fallback nil)
@@ -268,3 +273,15 @@
   (setq magit-branch-direct-configure nil)
   ;; don't automatically refresh the status buffer after running a git command
   (setq magit-refresh-status-buffer nil))
+
+;; Fix vterm shell on macOS to use system zsh instead of Nix bash
+(when IS-MAC
+  (after! vterm
+    (setq vterm-shell "/bin/zsh")))
+
+(evil-set-initial-state 'vterm-mode 'emacs)
+
+;; https://github.com/doomemacs/doomemacs/issues/8541
+(let ((lfile (concat doom-local-dir "straight/repos/transient/lisp/transient.el")))
+  (if (file-exists-p lfile)
+      (load lfile)))
