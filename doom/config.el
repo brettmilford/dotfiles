@@ -279,6 +279,13 @@
   (after! vterm
     (setq vterm-shell "/bin/zsh")))
 
+(after! vterm
+  (setq vterm-max-scrollback 10000)
+  (map! :map vterm-mode-map
+        :e "C-c w" doom-leader-workspace-map
+        :e "C-c C-w" evil-window-map
+        :e "C-c c" #'+vterm/here))
+
 (evil-set-initial-state 'vterm-mode 'emacs)
 
 ;; https://github.com/doomemacs/doomemacs/issues/8541
