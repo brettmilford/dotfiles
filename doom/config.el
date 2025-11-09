@@ -193,7 +193,7 @@
 (setq-default line-spacing 0.1)
 (setq doom-font (font-spec :family "Iosevka")
       doom-serif-font (font-spec :family "Iosevka Slab")
-      doom-variable-pitch-font (font-spec :family "Iosevka Etoile"))
+      doom-variable-pitch-font (font-spec :family "Iosevka Aile"))
 
 (after! vterm
   (evil-set-initial-state 'vterm-mode 'emacs))
@@ -252,11 +252,23 @@
 (setq tramp-copy-size-limit (* 1024 1024) ;; 1MB
       tramp-verbose 2)
 
+;; Requires tramp-version > 2.7
+(connection-local-set-profile-variables
+ 'remote-direct-async-process
+ '((tramp-direct-async-process . t)))
+
+;; Requires Emacs > 30.2
+(connection-local-set-profiles
+ '(:application tramp :protocol "rsync")
+ 'remote-direct-async-process)
+
+(setq magit-tramp-pipe-stty-settings 'pty)
+
 (after! tramp
   (with-eval-after-load 'compile
     (remove-hook 'compilation-mode-hook #'tramp-compile-disable-ssh-controlmaster-options)))
 
-
+;; TODO: Map magit-dispatch, magit-file-dispatch
 (after! magit
   (defun $magit-auto-revert-not-remote (orig-fun &rest args)
     (unless (and buffer-file-name (file-remote-p buffer-file-name))

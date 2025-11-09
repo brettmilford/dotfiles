@@ -43,6 +43,7 @@
        llm
        lsp
        tree-sitter
+       docker
 
        :os
        (:if (featurep :system 'macos) macos)
