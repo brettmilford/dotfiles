@@ -427,6 +427,22 @@ TARGET-SPEC is the :if-new or :target spec for new files."
 (after! org-roam
   (+pkm-org-roam))
 
+(use-package! consult-org-roam
+  :after org-roam
+  :commands (consult-org-roam-search
+             consult-org-roam-forward-links
+             consult-org-roam-backlinks)
+  :init
+  (setq consult-org-roam-grep-func #'consult-ripgrep)
+  :config
+  (map!
+   :leader
+   :prefix ("n" . "notes")
+   (:prefix ("r" . "org-roam")
+    :desc "Search roam" "s" #'consult-org-roam-search
+    :desc "Forward links" "l" #'consult-org-roam-forward-links
+    :desc "Backlinks" "B" #'consult-org-roam-backlinks)))
+
 ;;;; Citations
 
 (defun +pkm-org-cite ()

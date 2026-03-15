@@ -1,8 +1,7 @@
 ;;; init.el -*- lexical-binding: t; -*-
 
 (doom! :completion
-       ;;(corfu +orderless)
-       company
+       (corfu +orderless)
        vertico
 
        :ui
@@ -26,7 +25,7 @@
        ;;word-wrap
 
        :emacs
-       dired
+       (dired +dirvish)
        electric
        undo
        vc

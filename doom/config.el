@@ -55,7 +55,12 @@
       scroll-margin 1
       scroll-conservatively 10000
       scroll-preserve-screen-position 1)
-(unless window-system
+(if window-system
+    (when IS-MAC
+      (pixel-scroll-precision-mode 1)
+      (setq pixel-scroll-precision-use-momentum nil
+            pixel-scroll-precision-interpolate-page nil
+            pixel-scroll-precision-large-scroll-height 40.0))
   (xterm-mouse-mode 1)
   (global-set-key (kbd "<mouse-4>") 'scroll-down-line)
   (global-set-key (kbd "<mouse-5>") 'scroll-up-line))
@@ -104,16 +109,15 @@
   (map! "s-n" #'make-frame
         "s-w" #'delete-frame))
 
-(defvar +c/zoomed nil
-  "Whether the current window is zoomed.")
-
 (defun +c/toggle-zoom ()
-  "Toggle zoom state of the current window."
+  "Toggle zoom state of the current window.
+Uses a per-window parameter so multiple windows can be zoomed independently."
   (interactive)
-  (if +c/zoomed
-      (progn (winner-undo) (setq +c/zoomed nil))
+  (if (window-parameter nil 'zoomed)
+      (progn (winner-undo)
+             (set-window-parameter nil 'zoomed nil))
     (doom/window-maximize-buffer)
-    (setq +c/zoomed t)))
+    (set-window-parameter nil 'zoomed t)))
 
 (map! :map evil-window-map
       :desc "Zoom window" "z" #'+c/toggle-zoom)
@@ -190,20 +194,37 @@
 
 ;;;; Editor
 
+(defun +c/search-buffer ()
+  "Search buffer with consult-line, registering the pattern with evil for n/N."
+  (interactive)
+  (let ((initial (car consult--line-history)))
+    (consult-line initial)
+    (when-let* ((pattern (car consult--line-history))
+                (pat (evil-ex-make-search-pattern pattern)))
+      (setq evil-ex-search-pattern pat
+            evil-ex-search-direction 'forward)
+      (evil-push-search-history pattern 'forward)
+      (evil-ex-search-activate-highlight pat))))
+
+(map! :nv "/" #'+c/search-buffer)
+
 (after! highlight-indent-guides
   (remove-hook! (prog-mode text-mode conf-mode) #'highlight-indent-guides-mode))
 
 (setq projectile-project-search-path '(("~/src" . 2)))
 (setq magit-repository-directories projectile-project-search-path)
 
-(after! evil
-  (map! :nv "/" #'+default/search-buffer))
-
 (after! spell-fu
   (set-face-attribute 'spell-fu-incorrect-face nil :inherit 'unspecified))
 
 (after! evil-snipe
   (evil-snipe-mode -1))
+
+(after! avy
+  (map! :n "s" #'evil-avy-goto-char-2
+        :n "S" #'evil-avy-goto-line
+        :o "s" #'evil-avy-goto-char-2
+        :v "s" #'evil-avy-goto-char-2))
 
 (after! projectile
   (projectile-register-project-type 'nixflake '("flake.nix")
