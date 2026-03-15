@@ -1,6 +1,6 @@
 ;;; config/assistant/config.el -*- lexical-binding: t; -*-
 
-(defun +assistant-eval-config ()
+;;;; GPTel
 
 (use-package! gptel
   :init
@@ -29,20 +29,20 @@
         "M-RET" #'gptel-send)
 
   (defun +assist/gptel-toggle-branching ()
-    "Toggle settings for org-branching-context"
+    "Toggle settings for org-branching-context."
     (interactive)
-    (cond
-     (gptel-org-branching-context
-      (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "*** ")
-      (setf (alist-get 'org-mode gptel-response-prefix-alist) "")
-      (setq gptel-org-convert-response nil
-            gptel-org-branching-context nil))
-     ((not gptel-org-branching-context)
+    (if gptel-org-branching-context
+        (progn
+          (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "*** ")
+          (setf (alist-get 'org-mode gptel-response-prefix-alist) "")
+          (setq gptel-org-convert-response nil
+                gptel-org-branching-context nil))
       (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "@user\n")
       (setf (alist-get 'org-mode gptel-response-prefix-alist) "@assistant\n")
       (setq gptel-org-convert-response nil
-            gptel-org-branching-context 't))))
+            gptel-org-branching-context t))))
 
+  ;; Directives
   (let ((directory "~/org/src/llm_system_prompts"))
     (dolist (file (directory-files directory nil nil))
       (unless (file-directory-p file)
@@ -53,15 +53,15 @@
             (push (cons (intern filename) content) gptel-directives))))))
 
   (setq gptel-max-tokens nil
-        gptel-temperature nil ;; should get temp from model config
-        gptel-expert-commands nil ;; note if gptel-temperature is nil gptel-expert-command 't breaks the transient
+        gptel-temperature nil
+        gptel-expert-commands nil
         gptel-include-reasoning 'ignore)
 
   ;; Backends
-
-  (setq gptel-backend (gptel-make-gh-copilot "Copilot"))
+  (setq gptel-backend (gptel-make-anthropic "Claude" :stream t :key gptel-api-key))
   (setq gptel-model 'claude-sonnet-4)
 
+  (gptel-make-gh-copilot "Copilot")
   (gptel-make-openai "llama-cpp"
    :stream t
    :protocol "http"
@@ -69,14 +69,13 @@
    :models '(llm))
 
   (defun +assist/gptel-ollama-get-models (backend-name)
-    "Format Ollama models for gptel from backend named BACKEND-NAME."
+    "Fetch and register Ollama models for backend named BACKEND-NAME."
     (interactive)
     (let* ((backend (alist-get backend-name gptel--known-backends nil nil #'equal))
            (backend-url (when backend (concat (gptel-backend-protocol backend) "://"
                                               (gptel-backend-host backend))))
            (url (when backend-url (concat backend-url "/api/tags")))
            (result '())
-           ;; Model families with descriptions
            (model-descriptions
             '(("llama" . "Open source large language model")
               ("mistral" . "Efficient and powerful open language model")
@@ -107,9 +106,7 @@
             (dolist (model models)
               (let* ((name (alist-get 'name model))
                      (model-family (car (split-string name ":")))
-                     (digest (alist-get 'digest model))
-                     (size (/ (or (alist-get 'size model) 0) (* 1024 1024 1024.0))) ; Convert to GB
-                     (modified (alist-get 'modified_at model))
+                     (size (/ (or (alist-get 'size model) 0) (* 1024 1024 1024.0)))
                      (quantization (when (string-match "\\(q[0-9]+_[0-9]+\\)" name)
                                      (match-string 1 name)))
                      (description
@@ -117,10 +114,10 @@
                           (format "Ollama model (%.1fGB)" size)))
                      (context-window
                       (cond
-                       ((string-match-p "70b" name) 4)      ; 4k context
-                       ((string-match-p "13b\\|14b" name) 8) ; 8k context
-                       ((string-match-p "7b" name) 8)       ; 8k context
-                       (t 4)))                              ; default 4k
+                       ((string-match-p "70b" name) 4)
+                       ((string-match-p "13b\\|14b" name) 8)
+                       ((string-match-p "7b" name) 8)
+                       (t 4)))
                      (model-entry
                       `(,(intern name)
                         :description ,(concat description
@@ -128,7 +125,7 @@
                                                   (format " (%s)" quantization)
                                                 ""))
                         :context-window ,context-window
-                        :input-cost 0.0 ; Free/local models
+                        :input-cost 0.0
                         :output-cost 0.0
                         :capabilities ,(cond
                                         ((string-match-p "codellama\\|starcoder\\|wizard-coder" name)
@@ -141,19 +138,15 @@
 
         (error (message "Error fetching Ollama models: %s" (error-message-string err))))
 
-      (nreverse result)
-      (setf (gptel-backend-models backend) result)))
+      (setf (gptel-backend-models backend) (nreverse result))))
 
    (gptel-make-ollama "ollama"
      :stream t)
-   ;; NOTE: ollama endpoint must be available
-   ;; (+assist/gptel-ollama-get-models "ollama")
 
-   (gptel-make-anthropic "Claude" :stream t :key gptel-api-key))
-
+  ;; Magit Integration
   (after! gptel-magit
     (setq gptel-magit-commit-prompt
           (concat gptel-magit-prompt-zed
                   "\n- IMPORTANT: The first line is limited to 50 characters and the second line must be empty.")))
-  ;; (setf (gptel-get-backend "ChatGPT") nil)
+
   (message "config/assistant/config.el was evaluated"))

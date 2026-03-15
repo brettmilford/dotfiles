@@ -1,5 +1,7 @@
 ;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
 
+;;;; Dashboard
+
 (setq frame-title-format '("%b – Emacs"))
 (setq +doom-dashboard-name "*Dash*")
 (setq +doom-dashboard-ascii-banner-fn
@@ -40,6 +42,7 @@
                "\n"))
      'face 'doom-dashboard-banner))))
 
+;;;; Input
 
 ;; BUG: emacs-mac wide toolbar
 (add-hook 'doom-after-init-hook (lambda () (tool-bar-mode 1) (tool-bar-mode 0)))
@@ -57,112 +60,80 @@
   (global-set-key (kbd "<mouse-4>") 'scroll-down-line)
   (global-set-key (kbd "<mouse-5>") 'scroll-up-line))
 
-;; C-x * (c e k q) (C-x * ? ? for all)
 (setq calc-angle-mode 'rad
       calc-algebraic-mode t
       calc-symbolic-mode t)
 
-;; NOTE: auto-fill is generally faster than visual-line-mode.
-;(add-hook! 'text-mode-hook #'+word-wrap-mode)
-;; TODO: this doesn't work in markdown?
-;; needs to happen before markdown mode?
-;(remove-hook 'markdown-mode-hook #'auto-fill-mode)
-;(remove-hook 'text-mode-hook #'auto-fill-mode)
 (setq vc-follow-symlinks t)
 (setq frame-resize-pixelwise t)
 (setq confirm-kill-emacs nil)
 
+;;;; Navigation
+
 (map! :n "C-." '+eshell/toggle)
+
+(defun +c/evil-tmux-navigate (direction)
+  "Navigate to the window in DIRECTION, falling through to tmux if at edge."
+  (let ((cmd (concat "windmove-" direction)))
+    (condition-case nil
+        (funcall (intern cmd))
+      (error
+       (+c/evil-tmux-command direction)))))
+
+(defun +c/evil-tmux-command (direction)
+  "Send a select-pane command to tmux in DIRECTION."
+  (shell-command-to-string
+    (concat "tmux select-pane -"
+      (upcase (substring direction 0 1)))))
 
 (if (display-graphic-p)
     (map!
      (:after evil
-      :enm "C-h"   #'evil-window-left ;; NOTE: need to remap help
+      :enm "C-h"   #'evil-window-left
       :enm "C-j"   #'evil-window-down
       :enm "C-k"   #'evil-window-up
       :enm "C-l"   #'evil-window-right))
-  (progn
-    (defun evil-tmux-navigate (direction)
-      (let
-          ((cmd (concat "windmove-" direction)))
-        (condition-case nil
-            (funcall (read cmd))
-          (error
-           (evil-tmux-command direction)))))
+  (map!
+   (:after evil
+     :enm "C-h"   #'(lambda () (interactive) (+c/evil-tmux-navigate "left"))
+     :enm "C-j"   #'(lambda () (interactive) (+c/evil-tmux-navigate "down"))
+     :enm "C-k"   #'(lambda () (interactive) (+c/evil-tmux-navigate "up"))
+     :enm "C-l"   #'(lambda () (interactive) (+c/evil-tmux-navigate "right")))))
 
-    (defun evil-tmux-command (direction)
-      (shell-command-to-string
-        (concat "tmux select-pane -"
-          (evil-tmux-direction direction))))
+(when (and IS-MAC (display-graphic-p))
+  (map! "s-n" #'make-frame
+        "s-w" #'delete-frame))
 
-    (defun evil-tmux-direction (direction)
-      (upcase
-        (substring direction 0 1)))
-    (map!
-     (:after evil
-       :enm "C-h"   #'(lambda ()
-                       (interactive)
-                       (evil-tmux-navigate "left"))
-       :enm "C-j"   #'(lambda ()
-                       (interactive)
-                       (evil-tmux-navigate "down"))
-       :enm "C-k"   #'(lambda ()
-                       (interactive)
-                       (evil-tmux-navigate "up"))
-       :enm "C-l"   #'(lambda ()
-                       (interactive)
-                       (evil-tmux-navigate "right"))))))
-
-;(map! "C-x ?" 'help-command) ;; NOTE: 'SPC h .' does the same
-
-(if (and IS-MAC (display-graphic-p))
-         (map! "s-n" #'make-frame
-               "s-w" #'delete-frame))
-
-(defvar +c/zoomed nil)
+(defvar +c/zoomed nil
+  "Whether the current window is zoomed.")
 
 (defun +c/toggle-zoom ()
+  "Toggle zoom state of the current window."
   (interactive)
-  (cond (+c/zoomed
-         (winner-undo)
-         (setq +c/zoomed nil))
-        ((not +c/zoomed)
-         (doom/window-maximize-buffer)
-         (setq +c/zoomed 't))))
+  (if +c/zoomed
+      (progn (winner-undo) (setq +c/zoomed nil))
+    (doom/window-maximize-buffer)
+    (setq +c/zoomed t)))
 
 (map! :map evil-window-map
       :desc "Zoom window" "z" #'+c/toggle-zoom)
 
-;; UI & Theme
+;;;; Theme
 
-;; use light theme when running in apple_terminal
-;; TODO: revist, doesn't quite work
-;(unless (and (not(display-graphic-p))
-;             (and (string= (getenv "TERM_PROGRAM") "Apple_Terminal")
-;                  (not (string= (getenv "MACOS_DARKMODE") "true"))))
-;    (load-theme (intern (concat (symbol-name doom-theme) "-light")) t))
-
-;; (set-face-attribute 'default nil :foreground "#CFCFCF") ;; Slightly increase contrast
-;; (set-face-background 'default "undefined" (selected-frame)) ;; Sets to non-exsistent colour which falls back to terminal bg
-
-;; Theme
-;; Set theme on startup
 (when (executable-find "defaults")
-(with-temp-buffer
-  (call-process "defaults" nil t nil "read" "-g" "AppleInterfaceStyle")
-  (if (string-match-p "Dark" (buffer-string))
-      (setq doom-theme 'modus-vivendi)
+  (with-temp-buffer
+    (call-process "defaults" nil t nil "read" "-g" "AppleInterfaceStyle")
+    (if (string-match-p "Dark" (buffer-string))
+        (setq doom-theme 'modus-vivendi)
       (setq doom-theme 'modus-operandi))))
 
 (after! doom-themes
-  (setq
-   doom-themes-enable-bold t
-   doom-themes-enable-italic t))
+  (setq doom-themes-enable-bold t
+        doom-themes-enable-italic t))
 
-(defun toggle-theme ()
-  "Toggle light/dark of the current theme."
+(defun +c/toggle-theme ()
+  "Toggle between light and dark variants of the current theme."
   (interactive)
-  ;; Handle modus themes
   (cond ((eq doom-theme 'modus-vivendi)
          (disable-theme doom-theme)
          (setq doom-theme 'modus-operandi)
@@ -171,7 +142,6 @@
          (disable-theme doom-theme)
          (setq doom-theme 'modus-vivendi)
          (load-theme doom-theme t))
-        ;; Handle other themes with -light/-dark suffixes
         ((string-suffix-p "-light" (symbol-name doom-theme))
          (disable-theme doom-theme)
          (setq doom-theme (intern (string-remove-suffix "-light" (symbol-name doom-theme))))
@@ -180,33 +150,32 @@
          (disable-theme doom-theme)
          (setq doom-theme (intern (concat (string-remove-suffix "-dark" (symbol-name doom-theme)) "-light")))
          (load-theme doom-theme t))
-        ;; Default case: add -light suffix
         (t
          (disable-theme doom-theme)
          (setq doom-theme (intern (concat (symbol-name doom-theme) "-light")))
          (load-theme doom-theme t))))
 
-(map! "C-x t" 'toggle-theme)
-;; NOTE: Requires emacs-mac
-(add-hook 'mac-effective-appearance-change-hook 'toggle-theme)
+(map! "C-x t" '+c/toggle-theme)
+(add-hook 'mac-effective-appearance-change-hook '+c/toggle-theme)
+
+;;;; Fonts & UI
 
 (setq-default line-spacing 0.1)
 (setq doom-font (font-spec :family "Iosevka")
       doom-serif-font (font-spec :family "Iosevka Slab")
       doom-variable-pitch-font (font-spec :family "Iosevka Aile"))
 
-(after! vterm
-  (evil-set-initial-state 'vterm-mode 'emacs))
-
 (after! doom-modeline
-  (setq doom-modeline-unicode-fallback nil)
-  (setq doom-modeline-percent-position nil)
-  (setq doom-modeline-icon nil)
-  (setq doom-modeline-buffer-encoding nil)
-  (setq doom-modeline-version nil)
-  (setq doom-modeline-height 15))
-;; NOTE: toggle with doom/toggle-line-numbers (SPC t l)
+  (setq doom-modeline-unicode-fallback nil
+        doom-modeline-percent-position nil
+        doom-modeline-icon nil
+        doom-modeline-buffer-encoding nil
+        doom-modeline-version nil
+        doom-modeline-height 15))
+
 (setq display-line-numbers-type nil)
+
+;;;; Auth & Security
 
 (after! auth-source
   (setq auth-sources (nreverse auth-sources)))
@@ -214,25 +183,25 @@
 (use-package! pinentry
   :init (pinentry-start))
 
+;;;; Outline
+
+(add-hook 'emacs-lisp-mode-hook #'outline-minor-mode)
+(setq outline-minor-mode-cycle t)
+
+;;;; Editor
+
 (after! highlight-indent-guides
   (remove-hook! (prog-mode text-mode conf-mode) #'highlight-indent-guides-mode))
 
-(defvar devenv 't) ;; docker, vm (ssh), direnv/nix/localhost (t), devcontainer ?
-(cond ((eq devenv 'docker) (setq projectile-project-search-path '(("/docker:de:/src" . 2))))
-      (t (setq projectile-project-search-path '(("~/src" . 2)))))
+(setq projectile-project-search-path '(("~/src" . 2)))
 (setq magit-repository-directories projectile-project-search-path)
 
-;; NOTE: SPC s p does this
-;(map! :leader "p ]" '+ivy/project-search)
 (after! evil
   (map! :nv "/" #'+default/search-buffer))
 
 (after! spell-fu
   (set-face-attribute 'spell-fu-incorrect-face nil :inherit 'unspecified))
 
-;; TODO: should hook to dired mode
-;(add-hook! 'dired-mode-hook #'(lambda ()
-;                               (turn-off-evil-snipe-mode)))
 (after! evil-snipe
   (evil-snipe-mode -1))
 
@@ -244,20 +213,19 @@
 (after! clipetty
   (setq clipetty-tmux-ssh-tty "tmux show-environment -g SSH_TTY"))
 
-;; TRAMP performance improvements
+;;;; TRAMP
+
 (setq remote-file-name-inhibit-locks t
       tramp-use-scp-direct-remote-copying t
       remote-file-name-inhibit-auto-save-visited t)
 
-(setq tramp-copy-size-limit (* 1024 1024) ;; 1MB
+(setq tramp-copy-size-limit (* 1024 1024)
       tramp-verbose 2)
 
-;; Requires tramp-version > 2.7
 (connection-local-set-profile-variables
  'remote-direct-async-process
  '((tramp-direct-async-process . t)))
 
-;; Requires Emacs > 30.2
 (connection-local-set-profiles
  '(:application tramp :protocol "rsync")
  'remote-direct-async-process)
@@ -268,39 +236,29 @@
   (with-eval-after-load 'compile
     (remove-hook 'compilation-mode-hook #'tramp-compile-disable-ssh-controlmaster-options)))
 
-;; TODO: Map magit-dispatch, magit-file-dispatch
+;;;; Magit
+
 (after! magit
-  (defun $magit-auto-revert-not-remote (orig-fun &rest args)
+  (defun +c/magit-auto-revert-not-remote (orig-fun &rest args)
+    "Skip auto-revert for remote files to avoid TRAMP overhead."
     (unless (and buffer-file-name (file-remote-p buffer-file-name))
       (apply orig-fun args)))
 
-  ;; Don't auto-revert remote files
   (advice-add 'magit-turn-on-auto-revert-mode-if-desired
               :around
-              #'$magit-auto-revert-not-remote)
+              #'+c/magit-auto-revert-not-remote)
 
-  ;; don't show the diff by default in the commit buffer. Use `C-c C-d' to display it
-  (setq magit-commit-show-diff nil)
-  ;; don't show git variables in magit branch
-  (setq magit-branch-direct-configure nil)
-  ;; don't automatically refresh the status buffer after running a git command
-  (setq magit-refresh-status-buffer nil))
+  (setq magit-commit-show-diff nil
+        magit-branch-direct-configure nil
+        magit-refresh-status-buffer nil))
 
-;; Fix vterm shell on macOS to use system zsh instead of Nix bash
-(when IS-MAC
-  (after! vterm
-    (setq vterm-shell "/bin/zsh")))
+;;;; VTerm
 
 (after! vterm
+  (when IS-MAC (setq vterm-shell "/bin/zsh"))
   (setq vterm-max-scrollback 10000)
   (map! :map vterm-mode-map
         :e "C-c w" doom-leader-workspace-map
         :e "C-c C-w" evil-window-map
-        :e "C-c c" #'+vterm/here))
-
-(evil-set-initial-state 'vterm-mode 'emacs)
-
-;; https://github.com/doomemacs/doomemacs/issues/8541
-(let ((lfile (concat doom-local-dir "straight/repos/transient/lisp/transient.el")))
-  (if (file-exists-p lfile)
-      (load lfile)))
+        :e "C-c c" #'+vterm/here)
+  (evil-set-initial-state 'vterm-mode 'emacs))

@@ -22,6 +22,7 @@
        file-templates
        fold
        snippets
+       (format +lsp)
        ;;word-wrap
 
        :emacs
@@ -43,7 +44,7 @@
        llm
        lsp
        tree-sitter
-       docker
+       (docker +lsp +tree-sitter)
 
        :os
        (:if (featurep :system 'macos) macos)
@@ -51,26 +52,29 @@
 
        :lang
        emacs-lisp
-       sh
-       markdown
+       (sh +lsp)
+       (markdown +tree-sitter)
        (org +roam2
             +noter
             +pandoc
             +present)
-       latex
+       (latex +lsp)
        (rest +jq)
-       yaml
-       json
+       (yaml +lsp
+             +tree-sitter)
+       (json +lsp
+             +tree-sitter)
        data
-       nix
+       (nix +lsp
+            +tree-sitter)
        (cc +lsp
            +tree-sitter)
        (go +lsp
            +tree-sitter)
        (rust +lsp
              +tree-sitter)
-       (zig +lsp
-            +tree-sitter)
+       (javascript +lsp
+                   +tree-sitter)
 
        :term
        eshell

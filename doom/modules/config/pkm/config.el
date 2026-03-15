@@ -1,12 +1,20 @@
 ;;; config/pkm/config.el -*- lexical-binding: t; -*-
 ;;; --- Personal Knowledge Management config
 
+;;;; Variables
+
+(setq org-directory "~/org")
+(defvar +pkm-encrypt-enabled nil)
+(defvar +pkm-org-ext ".org")
+(defvar +pkm-org-archive-ext ".org_archive")
+
+;;;; Base Setup
+
 (defun +pkm-load ()
+  "Initialize PKM base settings."
   (setq org-roam-directory org-directory)
   (add-to-list 'auto-mode-alist '("\\.org_archive\\'" . org-mode))
   (add-to-list 'auto-mode-alist '("\\.org.gpg\\'"     . org-mode))
-  (defvar +pkm-org-ext ".org")
-  (defvar +pkm-org-archive-ext ".org_archive")
   (remove-hook 'text-mode-hook #'vi-tilde-fringe-mode)
   (require 'org-crypt)
   (setq epa-file-encrypt-to `(,user-mail-address)
@@ -16,39 +24,39 @@
   (org-crypt-use-before-save-magic)
   (setq org-tags-exclude-from-inheritance '("crypt")))
 
-(defun +pkm-encrypt()
-  (add-to-list 'auto-mode-alist '("\\.org.gpg\\'" . org-mode))
+(+pkm-load)
+
+;;;; Encrypt
+
+(defun +pkm/open-all-project-files ()
+  "Open all project files matching `+pkm-org-ext'."
+  (interactive)
+  (let ((project-root (doom-modeline--project-root)))
+    (when project-root
+      (dolist (file (projectile-current-project-files))
+        (when (string-suffix-p +pkm-org-ext file)
+          (find-file-noselect (expand-file-name file project-root)))))))
+
+(defun +pkm/open-all-project-files-alt ()
+  "Open all project files matching `+pkm-org-ext' using directory search."
+  (interactive)
+  (let ((project-root (doom-modeline--project-root)))
+    (when project-root
+      (let ((files (directory-files-recursively project-root +pkm-org-ext)))
+        (when files
+          (dolist (file files)
+            (find-file-noselect file)))))))
+
+(defun +pkm-encrypt ()
+  "Enable GPG encryption for org files.
+Extends `+pkm-load' base setup with encrypted file extensions."
   (add-to-list 'auto-mode-alist '("\\.org_archive.gpg\\'" . org-mode))
-  (setq epa-file-encrypt-to `(,user-mail-address)
-        epa-file-select-keys 1
-        org-crypt-key user-mail-address
-        org-crypt-disable-auto-save t)
-  (org-crypt-use-before-save-magic)
-  (setq org-tags-exclude-from-inheritance '("crypt"))
   (setq +pkm-org-ext ".org.gpg"
         +pkm-org-archive-ext ".org_archive.gpg")
   (setq org-archive-location "archive.org.gpg::* From %s")
-  (defun +pkm/open-all-project-files ()
-    "Open all project files"
-    (interactive)
-    (let ((project-root (doom-modeline--project-root)))
-      (when project-root
-        (do-list (file (projectile-current-projhect-files))
-                 (when (string-suffix-p +pkm-org-ext file)
-                   (find-file-noselect (expand-file-name file project-root)))))))
-
-  (defun +pkm/open-all-project-files-alt ()
-    "Open all project files"
-    (interactive)
-    (let ((project-root (doom-modeline--project-root)))
-          (when project-root
-            (let ((files (directory-files-recursively project-root +pkm-org-ext)))
-              (when files
-                (dolist (file files)
-                  (find-file-noselect file)))))))
 
   (cond ((modulep! :completion ivy)
-         (advice-add 'swiper-all :before #'pkm/open-all-project-files-alt))
+         (advice-add 'swiper-all :before #'+pkm/open-all-project-files-alt))
         ((modulep! :completion vertico)
          (map! :leader
                :prefix ("s" . "search")
@@ -61,7 +69,16 @@
       (setq org-agenda-file-regexp
             (replace-regexp-in-string "\\\\\\.org" "\\\\.org\\\\(\\\\.gpg\\\\)?"
                                       org-agenda-file-regexp)))))
-(defun +pkm-org-appeareance-x ()
+
+(when (modulep! +encrypt)
+  (setq +pkm-encrypt-enabled t)
+  (+pkm-encrypt))
+
+;;;; Appearance
+
+(defun +pkm-org-appearance-x ()
+  "Configure org-mode appearance for GUI.
+Only called when `window-system' is non-nil."
   (use-package! org-modern
       :hook ((org-mode . org-modern-mode)
              (org-agenda-finalize . org-modern-agenda))
@@ -92,17 +109,41 @@
   (setq +zen-text-scale 0)
   (add-hook! 'org-mode-hook #'writeroom-mode))
 
+;;;; Org
+
+(defun +pkm/org-capture-clocked ()
+  "Capture a note under the currently clocked heading."
+  (interactive)
+  (let ((org-capture-templates '(("c" "clocked" entry (clock) "* %?\n%i\n%a"))))
+    (+org-capture/open-frame nil "c")))
+
+(defun +pkm/org-yank-block-content ()
+  "Copy everything in #+ blocks."
+  (interactive)
+  (save-restriction
+      (org-narrow-to-block)
+      (let ((content (buffer-substring-no-properties (point-min) (point-max))))
+        (with-temp-buffer
+          (insert content)
+          (goto-char (point-min))
+          (while (re-search-forward "^#\\+.*\n?" nil t)
+            (replace-match ""))
+          (kill-ring-save (point-min) (point-max))))
+        (widen))
+  (message "Block yanked."))
+
+(defun +pkm/org-capture-central-project-file ()
+  "Find or create a central project capture file."
+  (let ((project-name (projectile-project-name)))
+    (+org--capture-central-file
+      (concat "projects/" project-name ".org") project-name)))
+
 (defun +pkm-org ()
-  ;; Stop this from overriding my global C-k binding
+  "Configure org-mode keybindings and commands for PKM."
   (map! :after org
         :map org-mode-map
         :n "C-k" nil)
-  (setq display-line-numbers-type nil)
-  (add-to-list 'org-modules 'org-habit)
-  (add-to-list 'org-modules 'org-mouse) ;; may need to require instead
-  (org-clock-persistence-insinuate)
 
-  ;(add-hook! 'org-mode-hook #'+word-wrap-mode)
   (remove-hook 'org-mode-hook #'auto-fill-mode)
 
   (map!
@@ -118,29 +159,15 @@
      :prefix ("c" . "clock")
        :desc "Capture clocked" "x" #'+pkm/org-capture-clocked)
 
-  (defun +pkm/org-capture-clocked ()
-    (interactive)
-    (let ((org-capture-templates '(("c" "clocked" entry (clock) "* %?\n%i\n%a"))))
-      (+org-capture/open-frame nil "c")))
+  (load! "lisp/org-notification"))
 
-  (defun +pkm/org-yank-block-content ()
-    "Copy everything in #+ blocks"
-    (interactive)
-    (save-restriction
-        (org-narrow-to-block)
-        (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-          (with-temp-buffer
-            (insert content)
-            (goto-char (point-min))
-            (while (re-search-forward "^#\\+.*\n?" nil t)
-              (replace-match ""))
-            (kill-ring-save (point-min) (point-max))))
-          (widen))
-    (message "Block yanked."))
-  ;(setq org-capture-templates
-  ;      '(("t" "Todo" entry
-  ;         (file+headline org-default-notes-file "Inbox")
-  ;         "* TODO %?\nSCHEDULED: %(org-insert-time-stamp (org-read-date nil t \"+1d\"))\n%i\n%a")))
+(after! org
+  (+pkm-org)
+
+  (setq display-line-numbers-type nil)
+  (add-to-list 'org-modules 'org-habit)
+  (add-to-list 'org-modules 'org-mouse)
+  (org-clock-persistence-insinuate)
 
   (setq org-todo-keywords
         '((sequence
@@ -168,13 +195,13 @@
            "* %u %?\n%i\n%a" :prepend t)
 
           ("p" "Templates for projects")
-          ("pt" "Project-local todo" entry  ; {project-root}/todo.org
+          ("pt" "Project-local todo" entry
            (file+headline +org-capture-project-todo-file "Backlog")
            "* TODO %?\n%i\n%a" :prepend t)
-          ("pn" "Project-local notes" entry  ; {project-root}/notes.org
+          ("pn" "Project-local notes" entry
            (file+headline +org-capture-project-notes-file "Inbox")
            "* %U %?\n%i\n%a" :prepend t)
-          ("pc" "Project-local changelog" entry  ; {project-root}/changelog.org
+          ("pc" "Project-local changelog" entry
            (file+headline +org-capture-project-changelog-file "Unreleased")
            "* %U %?\n%i\n%a" :prepend t)
 
@@ -195,98 +222,125 @@
            :heading "Changelog"
            :prepend t)))
 
-(defun +pkm/org-capture-central-project-file ()
-  "TODO"
-  (let ((project-name (projectile-project-name)))
-    (+org--capture-central-file
-      (concat "projects/" project-name ".org") project-name)))
-
   (let ((project-dir (expand-file-name "projects/" org-directory)))
     (if (file-directory-p project-dir)
         (setq org-agenda-files (append (list org-directory)
                                        (directory-files project-dir t org-agenda-file-regexp)))
       (setq org-agenda-files (list org-directory))))
+
   (setq
-  org-agenda-window-setup 'reorganize-frame
-  org-habit-show-habits t
-  org-habit-show-all-today t ;; BUG: No habit entries are shown otherwise?
-  org-habit-show-habits-only-for-today t
-  org-mouse-1-follows-link 'double
-  org-columns-default-format "%25ITEM %3PRIORITY %TODO %SCHEDULED %DEADLINE %TAGS"
-  org-fontify-done-headline t
-  org-agenda-view-columns-initially nil
-  org-refile-targets '((nil :maxlevel . 3)
-                       (org-agenda-files :maxlevel . 3))
-  org-refile-use-cache nil
-  org-refile-target-verify-function
-  (lambda ()
-   "Filters out Archive nodes"
-   (if (string= (nth 4 (org-heading-components)) "Archive")
-           (unless (ignore-errors (org-forward-element))
-             (goto-char (point-max))) t))
-  org-refile-allow-creating-parent-nodes 'confirm
-  org-refile-use-outline-path 'file
-  org-reverse-note-order t
-  org-outline-path-complete-in-steps nil
-  org-startup-folded t
-  org-cycle-open-archived-trees t
-  org-adapt-indentation nil
-  org-log-done 'time
-  org-enforce-todo-dependencies t
-  org-latex-bib-compiler "biber"
-  org-latex-pdf-process
-  '("%latex -interaction nonstopmode -output-directory %o %f"
-    "%bib %b"
-    "%latex -interaction nonstopmode -output-directory %o %f"
-    "%latex -interaction nonstopmode -output-directory %o %f")
-  org-export-date-timestamp-format "%B %-e, %Y"
-  org-log-into-drawer t
-  org-table-duration-custom-format 'minutes
-  org-clock-persist t
-  org-clock-continuously nil ;; TODO: Check shouldn't be 't
-  org-clock-persist-query-resume nil
-  org-clock-out-when-done t
-  org-clock-report-include-clocking-task t
-  org-html-self-link-headlines t
-  org-use-tag-inheritance t
-  org-crypt-key "brettmilford@gmail.com"
-  org-startup-indented nil
-  org-tags-column 0
-  org-pretty-entities t)
+   org-agenda-window-setup 'reorganize-frame
+   org-habit-show-habits t
+   org-habit-show-all-today t
+   org-habit-show-habits-only-for-today t
+   org-mouse-1-follows-link 'double
+   org-columns-default-format "%25ITEM %3PRIORITY %TODO %SCHEDULED %DEADLINE %TAGS"
+   org-fontify-done-headline t
+   org-agenda-view-columns-initially nil
+   org-refile-targets '((nil :maxlevel . 3)
+                        (org-agenda-files :maxlevel . 3))
+   org-refile-use-cache nil
+   org-refile-target-verify-function
+   (lambda ()
+     "Filters out Archive nodes"
+     (if (string= (nth 4 (org-heading-components)) "Archive")
+         (unless (ignore-errors (org-forward-element))
+           (goto-char (point-max))) t))
+   org-refile-allow-creating-parent-nodes 'confirm
+   org-refile-use-outline-path 'file
+   org-reverse-note-order t
+   org-outline-path-complete-in-steps nil
+   org-startup-folded t
+   org-cycle-open-archived-trees t
+   org-adapt-indentation nil
+   org-log-done 'time
+   org-enforce-todo-dependencies t
+   org-latex-bib-compiler "biber"
+   org-latex-pdf-process
+   '("%latex -interaction nonstopmode -output-directory %o %f"
+     "%bib %b"
+     "%latex -interaction nonstopmode -output-directory %o %f"
+     "%latex -interaction nonstopmode -output-directory %o %f")
+   org-export-date-timestamp-format "%B %-e, %Y"
+   org-log-into-drawer t
+   org-table-duration-custom-format 'minutes
+   org-clock-persist t
+   org-clock-continuously nil
+   org-clock-persist-query-resume nil
+   org-clock-out-when-done t
+   org-clock-report-include-clocking-task t
+   org-html-self-link-headlines t
+   org-use-tag-inheritance t
+   org-crypt-key "brettmilford@gmail.com"
+   org-startup-indented nil
+   org-tags-column 0
+   org-pretty-entities t)
 
   (use-package! ox-reveal
     :after org-mode)
 
-  (load! "lisp/org-notification"))
+  (when (modulep! +jira)
+    (+pkm-org-link-ghe)
+    (+pkm-org-capture-template-jira))
+  (when window-system
+    (+pkm-org-appearance-x)))
+
+;;;; Org Roam
+
+(defun +pkm/roam-goto-date ()
+  "Go to a daily note for a selected date."
+  (interactive)
+  (org-roam-dailies-goto-date nil "d"))
+
+(defun +pkm/roam-goto-tomorrow ()
+  "Go to tomorrow's daily note."
+  (interactive)
+  (org-roam-dailies-goto-tomorrow nil "d"))
+
+(defun +pkm/roam-goto-today ()
+  "Go to today's daily note."
+  (interactive)
+  (org-roam-dailies-goto-today "d"))
+
+(defun +pkm/roam-goto-yesterday ()
+  "Go to yesterday's daily note."
+  (interactive)
+  (org-roam-dailies-goto-yesterday nil "d"))
+
+(defun +pkm/roam-insert-tmpl ()
+  "Insert an org-roam node using a template."
+  (interactive)
+  (+pkm-org-roam-tmpl-capture 'org-roam-node-insert "./roam/tmpl"))
+
+(defun +pkm/roam-find-tmpl ()
+  "Find an org-roam node using a template."
+  (interactive)
+  (+pkm-org-roam-tmpl-capture 'org-roam-node-find "./roam/tmpl"))
 
 (defun +pkm-org-roam ()
-  ;; BUG: org-roam/pull/2141
+  "Configure org-roam for PKM."
   (map!
    :leader
    :prefix ("n" . "notes")
    (:prefix ("r" . "org-roam")
-    :desc "Tag file" "t" #'org-roam-tag-add ;; NOTE: 'SPC m m o t' as well.
-    :desc "Insert node w/ template" "I" #'(lambda () (interactive) (+pkm-org-roam-tmpl-capture 'org-roam-node-insert "./roam/tmpl"))
-    :desc "Find node w/ template" "N" #'(lambda () (interactive) (+pkm-org-roam-tmpl-capture 'org-roam-node-find "./roam/tmpl"))
+    :desc "Tag file" "t" #'org-roam-tag-add
+    :desc "Insert node w/ template" "I" #'+pkm/roam-insert-tmpl
+    :desc "Find node w/ template" "N" #'+pkm/roam-find-tmpl
     (:prefix ("d" . "by date")
-     :desc "Goto date" "d" #'(lambda () (interactive) (org-roam-dailies-goto-date nil "d"))
-     :desc "Goto tomorrow" "m" #'(lambda () (interactive) (org-roam-dailies-goto-tomorrow nil "d"))
-     :desc "Goto today" "n" #'(lambda () (interactive) (org-roam-dailies-goto-today "d"))
-     :desc "Goto yesterday" "y" #'(lambda () (interactive) (org-roam-dailies-goto-yesterday nil "d"))
+     :desc "Goto date" "d" #'+pkm/roam-goto-date
+     :desc "Goto tomorrow" "m" #'+pkm/roam-goto-tomorrow
+     :desc "Goto today" "n" #'+pkm/roam-goto-today
+     :desc "Goto yesterday" "y" #'+pkm/roam-goto-yesterday
      :desc "Goto date w/ template" "x" #'+pkm-org-roam-dailies-capture))
    :map org-mode-map
    :localleader
    :prefix ("m" . "org-roam")
    (:prefix ("d" . "by date")
-    :desc "Goto date" "d" #'(lambda () (interactive) (org-roam-dailies-goto-date nil "d"))
-    :desc "Goto tomorrow" "m" #'(lambda () (interactive) (org-roam-dailies-goto-tomorrow nil "d"))
-    :desc "Goto today" "n" #'(lambda () (interactive) (org-roam-dailies-goto-today "d"))
-    :desc "Goto yesterday" "y" #'(lambda () (interactive) (org-roam-dailies-goto-yesterday nil "d"))
+    :desc "Goto date" "d" #'+pkm/roam-goto-date
+    :desc "Goto tomorrow" "m" #'+pkm/roam-goto-tomorrow
+    :desc "Goto today" "n" #'+pkm/roam-goto-today
+    :desc "Goto yesterday" "y" #'+pkm/roam-goto-yesterday
     :desc "Capture template today" "x" #'org-roam-dailies-capture-today-w-tmpl))
-
-  ;; makes id links work, if org-mode hasn't cached them
-  ;; TODO: kills startup performance.
-  ;; (org-id-update-id-locations (org-roam-list-files) 't)
 
   ;; Exclude archive notes from org-roam parsing
   (add-to-list 'org-roam-file-exclude-regexp (concat org-directory "/archive/"))
@@ -294,11 +348,9 @@
   (setq org-roam-mode-sections
         '((org-roam-backlinks-section :unique t)
            org-roam-reflinks-section)
-        org-roam-buffer-no-delete-other-windows 't
-        org-roam-completion-system 'ivy
-        org-roam-db-gc-threshold most-positive-fixnum
-        ;org-roamtag-sources '(prop all-directories)
-        )
+        org-roam-buffer-no-delete-other-windows t
+        org-roam-completion-system 'default
+        org-roam-db-gc-threshold most-positive-fixnum)
 
   (setq org-roam-capture-templates
         `(("d" "default" plain
@@ -306,21 +358,29 @@
           :target (file+head ,(concat "./roam/${cxt}/%<%Y%m%d%H%M%S>-${slug}" +pkm-org-ext) "#+title: ${title}\n- topics ::\n")
           :unnarrowed t)))
 
+  (defun +pkm--build-templates-from-dir (dir type target-spec)
+    "Build capture templates from files in DIR.
+TYPE is the template type (e.g. \\='plain or \\='entry).
+TARGET-SPEC is the :if-new or :target spec for new files."
+    (let ((files (directory-files-recursively (expand-file-name dir org-roam-directory) "" t)))
+      (mapcar (lambda (file)
+                (let* ((f (file-name-nondirectory file))
+                       (key (replace-regexp-in-string "_.*" "" f))
+                       (desc (replace-regexp-in-string "\\(^.*_\\|\\.org$\\)" "" f)))
+                  (if (file-directory-p file)
+                      `(,key ,desc)
+                    `(,key ,desc ,type
+                      (file ,file)
+                      :if-new ,target-spec))))
+              files)))
+
   (defun +pkm-org-roam-tmpl-capture (fun dir)
-    (let* ((tmpl-dir (expand-file-name dir org-roam-directory))
-           (files (directory-files-recursively tmpl-dir "" t))
-           (org-roam-dailies-capture-templates
-            (mapcar (lambda (file)
-                 (let* ((f (file-name-nondirectory file))
-                        (key (replace-regexp-in-string "_.*" "" f))
-                        (desc (replace-regexp-in-string "\\(^.*_\\|\.org$\\)" "" f)))
-                   (if (file-directory-p file)
-                     `(,key ,desc)
-                     `(,key ,desc plain
-                       (file ,file)
-                       :if-new (file ,(concat "./roam/%<%Y%m%d%H%M%S>-${slug}" +pkm-org-ext))))))
-               files)))
-    (funcall fun nil :templates org-roam-dailies-capture-templates)))
+    "Capture with template from DIR using FUN."
+    (let ((org-roam-dailies-capture-templates
+           (+pkm--build-templates-from-dir
+            dir 'plain
+            `(file ,(concat "./roam/%<%Y%m%d%H%M%S>-${slug}" +pkm-org-ext)))))
+      (funcall fun nil :templates org-roam-dailies-capture-templates)))
 
   (setq org-roam-dailies-capture-templates
         `(("d" "default" entry "* %? :crypt:\n%U\n"
@@ -329,50 +389,48 @@
            :unnarrowed t)))
 
   (defun +pkm-org-roam-dailies-capture ()
+    "Capture a daily note with template selection."
     (interactive)
-    (let* ((tmpl-dir (expand-file-name "./daily/tmpl" org-roam-directory))
-           (files (directory-files-recursively tmpl-dir "" t))
-           (org-roam-dailies-capture-templates
-            (mapcar (lambda (file)
-                 (let* ((f (file-name-nondirectory file))
-                        (key (replace-regexp-in-string "_.*" "" f))
-                        (desc (replace-regexp-in-string "\\(^.*_\\|\.org$\\)" "" f)))
-                   (if (file-directory-p file)
-                     `(,key ,desc)
-                     `(,key ,desc entry
-                       (file ,file)
-                       :if-new (file+head ,(concat "%<%Y-%m-%d>" +pkm-org-ext)
-                                          "#+title: %<%A the %-e of %B %Y>\n#+filetags: %<:%Y:%B:>\n\n")))))
-               files)))
+    (let ((org-roam-dailies-capture-templates
+           (+pkm--build-templates-from-dir
+            "./daily/tmpl" 'entry
+            `(file+head ,(concat "%<%Y-%m-%d>" +pkm-org-ext)
+                        "#+title: %<%A the %-e of %B %Y>\n#+filetags: %<:%Y:%B:>\n\n"))))
       (org-roam-dailies-capture-date)))
 
-(after! org-roam-graph
-  (if IS-MAC
-   (setq org-roam-graph-viewer "open")
-   (setq org-roam-graph-viewer "xdg-open")))
+  (after! org-roam-graph
+    (if IS-MAC
+     (setq org-roam-graph-viewer "open")
+     (setq org-roam-graph-viewer "xdg-open")))
 
-(use-package! websocket
-    :after org-roam-ui)
+  (use-package! websocket
+      :after org-roam-ui)
 
-(use-package! org-roam-ui
-    :after org-roam
-    :config
-    (map!
-     :leader
-     (:prefix ("n" . "notes")
-     (:prefix ("r" . "roam")
-      :desc "Org Roam UI" "u"
-      (lambda () (interactive)
-        (if (member '(org-roam-ui-mode " org-roam-ui") minor-mode-alist)
-            (org-roam-ui-open)
-          (org-roam-ui-mode))))))
+  (use-package! org-roam-ui
+      :after org-roam
+      :config
+      (map!
+       :leader
+       (:prefix ("n" . "notes")
+       (:prefix ("r" . "roam")
+        :desc "Org Roam UI" "u"
+        (lambda () (interactive)
+          (if (member '(org-roam-ui-mode " org-roam-ui") minor-mode-alist)
+              (org-roam-ui-open)
+            (org-roam-ui-mode))))))
 
-    (setq org-roam-ui-sync-theme t
-          org-roam-ui-follow t
-          org-roam-ui-update-on-save t
-          org-roam-ui-open-on-start t)))
+      (setq org-roam-ui-sync-theme t
+            org-roam-ui-follow t
+            org-roam-ui-update-on-save t
+            org-roam-ui-open-on-start t)))
+
+(after! org-roam
+  (+pkm-org-roam))
+
+;;;; Citations
 
 (defun +pkm-org-cite ()
+  "Configure citation management."
   (setq reftex-default-bibliography (expand-file-name "references.bib" org-directory))
   (setq org-cite-global-bibliography (list reftex-default-bibliography))
   (after! bibtex
@@ -413,7 +471,6 @@
            ":END:\n\n"))
     (add-hook 'bibtex-completion-notes-mode-hook #'org-id-get-create))
 
-  ;; TODO: Switch to citar
   (use-package! org-ref
     :commands (org-ref-insert-cite-link org-ref-citation-hydra/body org-ref-bibtex-hydra/body)
     :config
@@ -439,7 +496,7 @@
       :desc "ORB Edit Citation Note" "c" #'orb-edit-citation-note
       :desc "ORB Note Actions" "b" #'orb-note-actions
       :desc "ORB Insert Link" "@" #'orb-insert-link))
-    (defun orb-capture-template (oldfun citekey &rest args)
+    (defun +pkm--orb-capture-template (oldfun citekey &rest args)
       "Bind org-roam-capture-templates for orb."
       (let ((org-roam-capture-templates
              `(("r" "bibliography reference" plain "%?\n"
@@ -459,9 +516,14 @@
                                     ))
                 :unnarrowed t))))
         (apply oldfun citekey args)))
-    (advice-add 'orb--new-note :around 'orb-capture-template)))
+    (advice-add 'orb--new-note :around '+pkm--orb-capture-template)))
+
+(+pkm-org-cite)
+
+;;;; Reading
 
 (defun +pkm-org-reading ()
+  "Configure reading and annotation tools."
   (after! org-noter
     (setq org-noter-notes-search-path bibtex-completion-notes-path))
 
@@ -476,13 +538,8 @@
   (use-package! org-mode-incremental-reading
     :hook (incremental-reading-mode . anki-editor-mode)
     :config
-    (defun org-protocol-open-file (fname)
-      "Process an org-protocol://open-file?url= style URL with FNAME.
-      Change a filename by mapping URLs to local filenames as set
-      in `org-protocol-project-alist'.
-      The location for a browser's bookmark should look like this:
-      javascript:location.href = \\='org-protocol://open-file?url=\\=' + \\
-      encodeURIComponent(location.href)"
+    (defun +pkm--org-protocol-open-file (fname)
+      "Process an org-protocol://open-file?url= style URL with FNAME."
       (let ((f (org-protocol-sanitize-uri
                 (plist-get (org-protocol-parse-parameters fname nil '(:file))
                            :file))))
@@ -490,9 +547,14 @@
 
     (add-to-list
      'org-protocol-protocol-alist
-     '("org-open-file" :protocol "open-file" :function org-protocol-open-file))))
+     '("org-open-file" :protocol "open-file" :function +pkm--org-protocol-open-file))))
+
+(+pkm-org-reading)
+
+;;;; GHE Links
 
 (defun +pkm-org-link-ghe ()
+  "Define org link type for GitHub Enterprise issues."
   (org-link-set-parameters "ghe"
                            :follow (lambda (path)
                                      (let* ((org (car (split-string path "/")))
@@ -507,25 +569,27 @@
                                         ((eq backend 'html)
                                          (format "<a href='https://git/%s/%s/issues/%s'>%s</a>" org repo issue desc))
                                         ((eq backend 'latex)
-                                         (format "\\href{https://git/%s/%s/issues/%s}{%s}" org repo issues desc))
+                                         (format "\\href{https://git/%s/%s/issues/%s}{%s}" org repo issue desc))
                                         ((eq backend 'ascii)
                                          (format "https://git/%s/%s/issues/%s" org repo issue))
                                         ((eq backend 'md)
                                          (format "[%s](https://git/%s/%s/issues/%s)" desc org repo issue)))))))
 
+;;;; Jira
+
 (defun +pkm-org-capture-template-jira ()
+  "Configure Jira integration with org-capture."
   (pushnew! org-link-abbrev-alist '("jira" .  "https://jira/browse/%s"))
 
-  (defun jira-capture-enrichment ()
+  (defun +pkm--jira-capture-enrichment ()
+    "Enrich a captured Jira issue with metadata from the API."
     (when-let* ((pt (point))
                 (issue-key (and (org-at-heading-p)
                                 (org-entry-get pt "JIRAISSUEKEY"))))
       (let-alist (jiralib2-get-issue issue-key)
-        ;; Update headline
         (let ((headline (format "[[jira:%s][%s]] %s" .key .key .fields.summary)))
           (message "Updating headline to : %s" headline)
           (org-edit-headline headline))
-        ;; Update properties
         (message "Updating Property Drawer")
         (cl-loop
          for (property value)
@@ -565,28 +629,5 @@
                  :immediate-finish t
                  :jump-to-captured t
                  :empty-lines-after 1
-                 :hook jira-capture-enrichment
+                 :hook +pkm--jira-capture-enrichment
                  :prepend t)))
-
-
-(defun +pkm-eval-config ()
-  (setq org-directory "~/org")
-  (defvar +pkm-encrypt-enabled nil)
-  (+pkm-load)
-  (when (modulep! +encrypt)
-      (setq +pkm-encrypt-enabled 't)
-      (+pkm-encrypt))
-
-  (after! org
-    (+pkm-org)
-    (when (modulep! +jira)
-      (+pkm-org-link-ghe)
-      (+pkm-org-capture-template-jira))
-    (when window-system
-      (+pkm-org-appeareance-x)))
-
-  (after! org-roam
-    (+pkm-org-roam))
-
-  (+pkm-org-cite)
-  (+pkm-org-reading))
