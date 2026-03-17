@@ -197,14 +197,13 @@ Uses a per-window parameter so multiple windows can be zoomed independently."
 (defun +c/search-buffer ()
   "Search buffer with consult-line, registering the pattern with evil for n/N."
   (interactive)
-  (let ((initial (car consult--line-history)))
-    (consult-line initial)
+    (consult-line)
     (when-let* ((pattern (car consult--line-history))
                 (pat (evil-ex-make-search-pattern pattern)))
       (setq evil-ex-search-pattern pat
             evil-ex-search-direction 'forward)
       (evil-push-search-history pattern 'forward)
-      (evil-ex-search-activate-highlight pat))))
+      (evil-ex-search-activate-highlight pat)))
 
 (map! :nv "/" #'+c/search-buffer)
 
