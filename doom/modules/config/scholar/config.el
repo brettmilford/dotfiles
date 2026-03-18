@@ -33,3 +33,32 @@
                  :function +scholar--org-protocol-capture)))
 
 ;;;###autoload (autoload '+scholar--org-protocol-capture "config/scholar/autoload" nil t)
+
+;;;; Dashboard mode (derived from magit-section-mode)
+
+(require 'magit-section)
+
+(defvar +scholar-dashboard-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map magit-section-mode-map)
+    (define-key map (kbd "r") #'+scholar/dashboard-refresh)
+    (define-key map (kbd "RET") #'+scholar/dashboard-open-item)
+    (define-key map (kbd "a") #'+scholar/dashboard-add-url)
+    (define-key map (kbd "s") #'+scholar/search-library)
+    (define-key map (kbd "q") #'quit-window)
+    map)
+  "Keymap for the scholar dashboard buffer.")
+
+(define-derived-mode +scholar-dashboard-mode magit-section-mode "Scholar"
+  "Major mode for the scholar library dashboard."
+  :group 'scholar)
+
+;;;; Keybindings
+
+(map!
+ :leader
+ :prefix ("n" . "notes")
+ (:prefix ("s" . "scholar")
+  :desc "Dashboard" "s" #'+scholar/dashboard
+  :desc "Add URL" "a" #'+scholar/dashboard-add-url
+  :desc "Search library" "/" #'+scholar/search-library))

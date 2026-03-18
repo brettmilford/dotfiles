@@ -261,3 +261,138 @@ INFO is the parsed protocol plist."
     (when url
       (+scholar/capture-url (org-protocol-sanitize-uri url) title))
     nil))  ;; return nil to prevent org-protocol from opening a file
+
+;;;###autoload
+(defun +scholar--format-age (date-string)
+  "Format DATE-STRING (YYYY-MM-DD) as relative age (e.g. '2d ago', '1w ago')."
+  (if (null date-string)
+      ""
+    (let* ((then (date-to-time (concat date-string " 00:00:00")))
+           (days (/ (float-time (time-subtract (current-time) then)) 86400)))
+      (cond
+       ((< days 1) "today")
+       ((< days 2) "1d ago")
+       ((< days 7) (format "%dd ago" (truncate days)))
+       ((< days 30) (format "%dw ago" (truncate (/ days 7))))
+       ((< days 365) (format "%dmo ago" (truncate (/ days 30))))
+       (t (format "%dy ago" (truncate (/ days 365))))))))
+
+;;;###autoload
+(defun +scholar--read-state-icon (state)
+  "Return display character for read STATE."
+  (pcase state
+    ("unread"   "o")
+    ("reading"  "*")
+    ("read"     "x")
+    ("archived" "-")
+    (_ "?")))
+
+;;;###autoload
+(defun +scholar/dashboard ()
+  "Open the scholar library dashboard."
+  (interactive)
+  (let ((buf (get-buffer-create "*scholar*")))
+    (with-current-buffer buf
+      (+scholar--dashboard-render)
+      (switch-to-buffer buf))))
+
+;;;###autoload
+(defun +scholar--dashboard-render ()
+  "Render the scholar dashboard in current buffer."
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (+scholar-dashboard-mode)
+    (magit-insert-section (scholar-root)
+      ;; Header
+      (insert (propertize " scholar" 'face 'magit-section-heading) "  "
+              (propertize (abbreviate-file-name scholar-library-dir)
+                          'face 'magit-dimmed)
+              "\n\n")
+      ;; Reading Queue
+      (+scholar--dashboard-insert-section
+       "Reading Queue"
+       (+scholar--query-library-nodes '(:read-state "reading") 20))
+      ;; Recently Added
+      (+scholar--dashboard-insert-section
+       "Recently Added"
+       (let ((nodes (+scholar--query-library-nodes nil 20)))
+         (sort nodes (lambda (a b)
+                       (string> (or (plist-get a :added) "")
+                                (or (plist-get b :added) ""))))))
+      ;; By Tag
+      (+scholar--dashboard-insert-tags)
+      ;; Footer
+      (insert "\n"
+              (propertize " [s]" 'face 'magit-section-heading) " search  "
+              (propertize "[a]" 'face 'magit-section-heading) " add URL  "
+              (propertize "[f]" 'face 'magit-section-heading) " feeds  "
+              (propertize "[r]" 'face 'magit-section-heading) " refresh  "
+              (propertize "[q]" 'face 'magit-section-heading) " quit\n"))
+    (goto-char (point-min))
+    (setq buffer-read-only t)))
+
+;;;###autoload
+(defun +scholar--dashboard-insert-section (heading items)
+  "Insert a dashboard section with HEADING and ITEMS."
+  (when items
+    (magit-insert-section (scholar-section heading)
+      (magit-insert-heading
+        (format "%s (%d)" heading (length items)))
+      (dolist (item items)
+        (let* ((title (plist-get item :title))
+               (item-type (or (plist-get item :item-type) ""))
+               (read-state (or (plist-get item :read-state) "unread"))
+               (added (plist-get item :added))
+               (file (plist-get item :file))
+               (icon (+scholar--read-state-icon read-state))
+               (age (+scholar--format-age added)))
+          (magit-insert-section (scholar-item file t)
+            (insert (format "  %s %-50s %-12s %s\n"
+                            icon
+                            (truncate-string-to-width (or title "") 50 nil nil t)
+                            item-type
+                            age)))))
+      (insert "\n"))))
+
+;;;###autoload
+(defun +scholar--dashboard-insert-tags ()
+  "Insert the By Tag section in the dashboard."
+  (let ((tags (+scholar--query-tags)))
+    (when tags
+      (magit-insert-section (scholar-section "By Tag")
+        (magit-insert-heading "By Tag")
+        (dolist (tag-count tags)
+          (magit-insert-section (scholar-tag (car tag-count))
+            (insert (format "  %-40s (%d)\n"
+                            (car tag-count) (cdr tag-count)))))
+        (insert "\n")))))
+
+;;;###autoload
+(defun +scholar/dashboard-refresh ()
+  "Refresh the scholar dashboard."
+  (interactive)
+  (when (equal (buffer-name) "*scholar*")
+    (+scholar--dashboard-render)))
+
+;;;###autoload
+(defun +scholar/dashboard-open-item ()
+  "Open the library item at point."
+  (interactive)
+  (when-let ((section (magit-current-section))
+             (value (oref section value)))
+    (when (stringp value)
+      (find-file value))))
+
+;;;###autoload
+(defun +scholar/dashboard-add-url ()
+  "Prompt for a URL and capture it."
+  (interactive)
+  (let ((url (read-string "URL: ")))
+    (when (and url (not (string-empty-p url)))
+      (+scholar/capture-url url))))
+
+;;;###autoload
+(defun +scholar/search-library ()
+  "Search library nodes with consult-ripgrep."
+  (interactive)
+  (consult-ripgrep scholar-library-dir))
