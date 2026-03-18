@@ -84,6 +84,7 @@
        assistant
        pkm
        collab
+       scholar
        (default +bindings +smartparens))
 
 (add-to-list 'default-frame-alist '(width . 100))
