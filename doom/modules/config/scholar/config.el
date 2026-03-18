@@ -61,7 +61,8 @@
  (:prefix ("s" . "scholar")
   :desc "Dashboard" "s" #'+scholar/dashboard
   :desc "Add URL" "a" #'+scholar/dashboard-add-url
-  :desc "Search library" "/" #'+scholar/search-library))
+  :desc "Search library" "/" #'+scholar/search-library
+  :desc "Set read state" "r" #'+scholar/set-read-state))
 
 ;;;; Reading mode auto-activation
 

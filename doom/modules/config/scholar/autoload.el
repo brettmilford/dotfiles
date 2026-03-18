@@ -488,3 +488,17 @@ INFO is the parsed protocol plist."
   (if (get-buffer "*scholar*")
       (switch-to-buffer "*scholar*")
     (+scholar/dashboard)))
+
+;;;###autoload
+(defun +scholar/set-read-state ()
+  "Set read state on the current org file (if it's a library node)."
+  (interactive)
+  (if (and buffer-file-name
+           (string-prefix-p (expand-file-name scholar-library-dir)
+                            (expand-file-name buffer-file-name)))
+      (let ((state (completing-read "Read state: "
+                                    '("unread" "reading" "read" "archived")
+                                    nil t)))
+        (+scholar--set-read-state buffer-file-name state)
+        (message "scholar: set to %s" state))
+    (message "scholar: not a library node")))
