@@ -1,0 +1,18 @@
+;;; mailroom-accounts.el -*- lexical-binding: t; -*-
+;; Private email account configuration — DO NOT commit to version control.
+;; Copy this template and fill in your account details.
+
+;; Credentials (passwords, app passwords) go in ~/.authinfo.gpg:
+;;   machine smtp.gmail.com login user@gmail.com port 587 password YOUR_APP_PASSWORD
+;;   machine imap.gmail.com login user@gmail.com port 993 password YOUR_APP_PASSWORD
+
+;; (set-email-account! "Personal"
+;;   '((mu4e-sent-folder       . "/personal/Sent")
+;;     (mu4e-drafts-folder     . "/personal/Drafts")
+;;     (mu4e-trash-folder      . "/personal/Trash")
+;;     (mu4e-refile-folder     . "/personal/Archive")
+;;     (user-mail-address      . "user@gmail.com")
+;;     (smtpmail-smtp-user     . "user@gmail.com")
+;;     (smtpmail-smtp-server   . "smtp.gmail.com")
+;;     (smtpmail-smtp-service  . 587))
+;;   t) ; default account

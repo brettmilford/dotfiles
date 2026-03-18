@@ -31,11 +31,12 @@
          (markdown-mode . annotate-mode))
   :init
   (map! :leader
-        (:prefix ("A" . "annotate")
-         :desc "Create annotation" "a" #'annotate-create
-         :desc "List annotations"  "l" #'annotate-list
-         :desc "Next annotation"   "n" #'annotate-next
-         :desc "Previous"          "p" #'annotate-prev)))
+        (:prefix ("c" . "collab")
+         (:prefix ("a" . "annotate")
+          :desc "Create annotation" "a" #'annotate-create
+          :desc "List annotations"  "l" #'annotate-list
+          :desc "Next annotation"   "n" #'annotate-next
+          :desc "Previous"          "p" #'annotate-prev))))
 
 ;;;; Bridge (auto-activates when both collab and annotate are loaded)
 

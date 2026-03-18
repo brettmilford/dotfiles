@@ -40,7 +40,7 @@
       (setf (alist-get 'org-mode gptel-prompt-prefix-alist) "@user\n")
       (setf (alist-get 'org-mode gptel-response-prefix-alist) "@assistant\n")
       (setq gptel-org-convert-response nil
-            gptel-org-branching-context t))))
+            gptel-org-branching-context t)))
 
   ;; Directives
   (let ((directory "~/org/src/llm_system_prompts"))

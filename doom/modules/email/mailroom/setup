@@ -1,0 +1,413 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Mailroom setup — configures mbsync, msmtp, mu, and mailroom-accounts.el
+# by prompting for email credentials interactively.
+#
+# Idempotent: safe to run multiple times. Re-running with the same account
+# name updates that account's config in place, preserving other accounts.
+
+MAILDIR="${MAILDIR:-$HOME/.mail}"
+DOOM_USER_DIR="${DOOM_USER_DIR:-$HOME/.config/doom}"
+ACCOUNTS_FILE="$DOOM_USER_DIR/mailroom-accounts.el"
+MBSYNCRC="$HOME/.mbsyncrc"
+MSMTP_CONFIG="$HOME/.config/msmtp/config"
+AUTHINFO="$HOME/.authinfo.gpg"
+AUTHINFO_PLAIN="$(mktemp)"
+
+trap 'rm -f "$AUTHINFO_PLAIN"' EXIT
+
+# --- Helpers ---
+
+die() { printf '\033[31merror:\033[0m %s\n' "$1" >&2; exit 1; }
+info() { printf '\033[34m==>\033[0m %s\n' "$1"; }
+warn() { printf '\033[33mwarn:\033[0m %s\n' "$1"; }
+ask() { printf '\033[32m?\033[0m %s ' "$1"; read -r REPLY; }
+ask_secret() { printf '\033[32m?\033[0m %s ' "$1"; read -rs REPLY; echo; }
+
+# Check prerequisites
+for cmd in mu mbsync msmtp gpg; do
+    command -v "$cmd" >/dev/null 2>&1 || die "$cmd is not installed"
+done
+
+# Detect provider settings from email domain
+detect_provider() {
+    local domain="${1#*@}"
+    case "$domain" in
+        gmail.com|googlemail.com)
+            IMAP_HOST="imap.gmail.com"
+            SMTP_HOST="smtp.gmail.com"
+            SMTP_PORT=587
+            PROVIDER_NOTE="Use an App Password: https://myaccount.google.com/apppasswords"
+            ;;
+        outlook.com|hotmail.com|live.com)
+            IMAP_HOST="outlook.office365.com"
+            SMTP_HOST="smtp.office365.com"
+            SMTP_PORT=587
+            PROVIDER_NOTE="Use an App Password if 2FA is enabled"
+            ;;
+        icloud.com|me.com|mac.com)
+            IMAP_HOST="imap.mail.me.com"
+            SMTP_HOST="smtp.mail.me.com"
+            SMTP_PORT=587
+            PROVIDER_NOTE="Use an App-Specific Password: https://appleid.apple.com"
+            ;;
+        fastmail.com|messagingengine.com)
+            IMAP_HOST="imap.fastmail.com"
+            SMTP_HOST="smtp.fastmail.com"
+            SMTP_PORT=587
+            PROVIDER_NOTE="Use an App Password from Settings > Privacy & Security"
+            ;;
+        protonmail.com|proton.me|pm.me)
+            IMAP_HOST="127.0.0.1"
+            SMTP_HOST="127.0.0.1"
+            SMTP_PORT=1025
+            PROVIDER_NOTE="Requires Proton Mail Bridge running locally"
+            ;;
+        *)
+            IMAP_HOST="imap.$domain"
+            SMTP_HOST="smtp.$domain"
+            SMTP_PORT=587
+            PROVIDER_NOTE=""
+            ;;
+    esac
+}
+
+# --- Collect accounts ---
+
+declare -a NEW_ACCOUNTS=()  # "name|name_lower|email|password|imap_host|smtp_host|smtp_port"
+
+add_account() {
+    ask "Account name (e.g. Personal, Work):"
+    local name="$REPLY"
+    local name_lower
+    name_lower="$(echo "$name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
+
+    ask "Email address:"
+    local email="$REPLY"
+
+    detect_provider "$email"
+
+    if [ -n "$PROVIDER_NOTE" ]; then
+        warn "$PROVIDER_NOTE"
+    fi
+
+    ask "IMAP host [$IMAP_HOST]:"
+    [ -n "$REPLY" ] && IMAP_HOST="$REPLY"
+
+    ask "SMTP host [$SMTP_HOST]:"
+    [ -n "$REPLY" ] && SMTP_HOST="$REPLY"
+
+    ask "SMTP port [$SMTP_PORT]:"
+    [ -n "$REPLY" ] && SMTP_PORT="$REPLY"
+
+    ask_secret "Password / App Password:"
+    local password="$REPLY"
+
+    NEW_ACCOUNTS+=("$name|$name_lower|$email|$password|$IMAP_HOST|$SMTP_HOST|$SMTP_PORT")
+
+    ask "Add another account? [y/N]"
+    if [[ "$REPLY" =~ ^[Yy] ]]; then
+        add_account
+    fi
+}
+
+# --- Config file manipulation ---
+
+# Remove a named account block from mbsyncrc.
+# Account blocks start with "IMAPAccount <name>" and end at the next blank line
+# after "SyncState *".
+remove_mbsync_account() {
+    local name_lower="$1" file="$2"
+    [ -f "$file" ] || return 0
+    # Remove IMAPAccount, IMAPStore, MaildirStore, and Channel blocks for this account
+    local tmp
+    tmp="$(mktemp)"
+    awk -v acct="$name_lower" '
+        /^IMAPAccount /  { if ($2 == acct) { skip=1; next } }
+        /^IMAPStore /    { if ($2 == acct"-remote") { skip=1; next } }
+        /^MaildirStore / { if ($2 == acct"-local") { skip=1; next } }
+        /^Channel /      { if ($2 == acct) { skip=1; next } }
+        skip && /^$/ { skip=0; next }
+        skip { next }
+        { print }
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
+# Remove a named account block from msmtp config.
+# Account blocks start with "account <name>" (not "account default : ...").
+remove_msmtp_account() {
+    local name_lower="$1" file="$2"
+    [ -f "$file" ] || return 0
+    local tmp
+    tmp="$(mktemp)"
+    awk -v acct="$name_lower" '
+        /^account +default/ { print; next }
+        /^account / { if ($2 == acct) { skip=1; next } }
+        skip && /^$/ { skip=0; next }
+        skip { next }
+        { print }
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
+# Remove a named account block from mailroom-accounts.el.
+# Blocks start with (set-email-account! "Name" and end with the line containing just ")".
+remove_accounts_el_entry() {
+    local name="$1" file="$2"
+    [ -f "$file" ] || return 0
+    local tmp
+    tmp="$(mktemp)"
+    awk -v acct="$name" '
+        /^\(set-email-account!/ {
+            match($0, /"([^"]+)"/, m)
+            if (m[1] == acct) { skip=1; next }
+        }
+        skip && /^  [a-z(nil|t)]/ { next }
+        skip { skip=0; next }
+        { print }
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
+# --- Write configs ---
+
+write_authinfo() {
+    info "Updating $AUTHINFO"
+
+    # Decrypt existing authinfo if present
+    if [ -f "$AUTHINFO" ]; then
+        gpg --quiet --decrypt "$AUTHINFO" 2>/dev/null > "$AUTHINFO_PLAIN" || true
+    fi
+
+    for account in "${NEW_ACCOUNTS[@]}"; do
+        IFS='|' read -r name name_lower email password imap_host smtp_host smtp_port <<< "$account"
+
+        # Remove existing entries for this email/host combo
+        if [ -s "$AUTHINFO_PLAIN" ]; then
+            grep -v "$imap_host.*$email\|$smtp_host.*$email" "$AUTHINFO_PLAIN" > "${AUTHINFO_PLAIN}.tmp" || true
+            mv "${AUTHINFO_PLAIN}.tmp" "$AUTHINFO_PLAIN"
+        fi
+
+        echo "machine $imap_host login $email port 993 password $password" >> "$AUTHINFO_PLAIN"
+        echo "machine $smtp_host login $email port $smtp_port password $password" >> "$AUTHINFO_PLAIN"
+    done
+
+    # Detect GPG key
+    local gpg_key
+    gpg_key="$(gpg --list-secret-keys --keyid-format long 2>/dev/null | grep -m1 '^sec' | awk '{print $2}' | cut -d/ -f2)"
+
+    if [ -z "$gpg_key" ]; then
+        die "No GPG secret key found. Create one with: gpg --full-generate-key"
+    fi
+
+    gpg --quiet --yes --recipient "$gpg_key" --encrypt --output "$AUTHINFO" "$AUTHINFO_PLAIN"
+    info "Encrypted credentials with GPG key $gpg_key"
+}
+
+write_mbsyncrc() {
+    info "Updating $MBSYNCRC"
+
+    # Remove existing blocks for accounts we're (re)configuring
+    for account in "${NEW_ACCOUNTS[@]}"; do
+        IFS='|' read -r name name_lower email password imap_host smtp_host smtp_port <<< "$account"
+        remove_mbsync_account "$name_lower" "$MBSYNCRC"
+    done
+
+    # Append new account blocks
+    for account in "${NEW_ACCOUNTS[@]}"; do
+        IFS='|' read -r name name_lower email password imap_host smtp_host smtp_port <<< "$account"
+
+        local tls_type="IMAPS"
+        local extra=""
+        if [ "$imap_host" = "127.0.0.1" ]; then
+            tls_type="None"
+            extra="Port 1143
+"
+        fi
+
+        cat >> "$MBSYNCRC" <<EOF
+IMAPAccount $name_lower
+Host $imap_host
+User $email
+PassCmd "gpg --quiet --for-your-eyes-only --no-tty --decrypt ~/.authinfo.gpg | grep $imap_host | grep $email | sed 's/.*password //'"
+TLSType $tls_type
+${extra}
+IMAPStore ${name_lower}-remote
+Account $name_lower
+
+MaildirStore ${name_lower}-local
+Subfolders Verbatim
+Path $MAILDIR/$name_lower/
+Inbox $MAILDIR/$name_lower/INBOX
+
+Channel $name_lower
+Far :${name_lower}-remote:
+Near :${name_lower}-local:
+Patterns *
+Create Both
+Expunge Both
+SyncState *
+
+EOF
+    done
+
+    chmod 600 "$MBSYNCRC"
+}
+
+write_msmtp_config() {
+    info "Updating $MSMTP_CONFIG"
+
+    mkdir -p "$(dirname "$MSMTP_CONFIG")"
+    mkdir -p "$HOME/.local/share/msmtp"
+
+    # Create defaults header if file doesn't exist
+    if [ ! -f "$MSMTP_CONFIG" ]; then
+        cat > "$MSMTP_CONFIG" <<'EOF'
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        ~/.local/share/msmtp/msmtp.log
+
+EOF
+    fi
+
+    # Remove existing blocks for accounts we're (re)configuring
+    for account in "${NEW_ACCOUNTS[@]}"; do
+        IFS='|' read -r name name_lower email password imap_host smtp_host smtp_port <<< "$account"
+        remove_msmtp_account "$name_lower" "$MSMTP_CONFIG"
+    done
+
+    # Append new account blocks
+    local need_default=false
+    if ! grep -q '^account default' "$MSMTP_CONFIG" 2>/dev/null; then
+        need_default=true
+    fi
+
+    for account in "${NEW_ACCOUNTS[@]}"; do
+        IFS='|' read -r name name_lower email password imap_host smtp_host smtp_port <<< "$account"
+
+        cat >> "$MSMTP_CONFIG" <<EOF
+account        $name_lower
+host           $smtp_host
+port           $smtp_port
+from           $email
+user           $email
+passwordeval   "gpg --quiet --for-your-eyes-only --no-tty --decrypt ~/.authinfo.gpg | grep $smtp_host | grep $email | sed 's/.*password //'"
+
+EOF
+        if $need_default; then
+            echo "account default : $name_lower" >> "$MSMTP_CONFIG"
+            echo >> "$MSMTP_CONFIG"
+            need_default=false
+        fi
+    done
+
+    chmod 600 "$MSMTP_CONFIG"
+}
+
+write_accounts_el() {
+    info "Updating $ACCOUNTS_FILE"
+
+    # Create header if file doesn't exist
+    if [ ! -f "$ACCOUNTS_FILE" ]; then
+        cat > "$ACCOUNTS_FILE" <<EOF
+;;; mailroom-accounts.el -*- lexical-binding: t; -*-
+;; Generated by mailroom setup — $(date +%Y-%m-%d)
+;; DO NOT commit to version control.
+
+EOF
+    fi
+
+    # Remove existing blocks for accounts we're (re)configuring
+    for account in "${NEW_ACCOUNTS[@]}"; do
+        IFS='|' read -r name name_lower email password imap_host smtp_host smtp_port <<< "$account"
+        remove_accounts_el_entry "$name" "$ACCOUNTS_FILE"
+    done
+
+    # Determine if any account is already marked as default
+    local need_default=true
+    if grep -q '  t)' "$ACCOUNTS_FILE" 2>/dev/null; then
+        need_default=false
+    fi
+
+    # Append new account blocks
+    for account in "${NEW_ACCOUNTS[@]}"; do
+        IFS='|' read -r name name_lower email password imap_host smtp_host smtp_port <<< "$account"
+
+        local default_flag="nil"
+        if $need_default; then
+            default_flag="t"
+            need_default=false
+        fi
+
+        cat >> "$ACCOUNTS_FILE" <<EOF
+(set-email-account! "$name"
+  '((mu4e-sent-folder       . "/$name_lower/Sent")
+    (mu4e-drafts-folder     . "/$name_lower/Drafts")
+    (mu4e-trash-folder      . "/$name_lower/Trash")
+    (mu4e-refile-folder     . "/$name_lower/Archive")
+    (user-mail-address      . "$email")
+    (smtpmail-smtp-user     . "$email")
+    (smtpmail-smtp-server   . "$smtp_host")
+    (smtpmail-smtp-service  . $smtp_port))
+  $default_flag)
+
+EOF
+    done
+}
+
+create_maildirs() {
+    info "Creating maildir structure at $MAILDIR"
+    for account in "${NEW_ACCOUNTS[@]}"; do
+        IFS='|' read -r name name_lower email password imap_host smtp_host smtp_port <<< "$account"
+        mkdir -p "$MAILDIR/$name_lower"
+    done
+}
+
+sync_and_index() {
+    info "Running mbsync (this may take a while)..."
+    mbsync -a
+
+    if mu info >/dev/null 2>&1; then
+        info "Reindexing mu"
+        mu index
+    else
+        info "Initializing mu database"
+        mu init --maildir="$MAILDIR"
+        info "Indexing mail"
+        mu index
+    fi
+}
+
+# --- Main ---
+
+echo
+echo "  Mailroom Setup"
+echo "  =============="
+echo
+echo "  This will configure mbsync, msmtp, mu, and mailroom"
+echo "  for your email accounts."
+echo
+echo "  Safe to run multiple times — existing accounts are"
+echo "  updated in place, other accounts are preserved."
+echo
+
+add_account
+
+echo
+write_authinfo
+write_mbsyncrc
+write_msmtp_config
+create_maildirs
+write_accounts_el
+sync_and_index
+
+echo
+info "Setup complete! Launch mailroom with:"
+echo "    emacs: M-x =mailroom"
+echo "    shell: ~/.local/bin/mailroom"
+echo
+info "Run 'doom sync' if you haven't already."

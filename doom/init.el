@@ -75,6 +75,10 @@
        (javascript +lsp
                    +tree-sitter)
 
+       :email
+       mu4e
+       mailroom
+
        :term
        eshell
        vterm
