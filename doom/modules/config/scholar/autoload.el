@@ -189,7 +189,7 @@ Returns plist with :title :author :date :site."
 (defun +scholar--html-to-org (html)
   "Convert HTML string to org-mode string via pandoc.
 Returns the org content string, or nil if pandoc fails."
-  (condition-case err
+  (condition-case _err
       (with-temp-buffer
         (insert html)
         (let ((exit-code (call-process-region
@@ -230,8 +230,7 @@ TITLE is optional — extracted from HTML if not provided."
        (message "scholar: URL is a PDF. Use `lit insert --pdf` instead."))
       (t
        ;; Copy data out of url-retrieve buffer before processing
-       (let ((fetched-body body)
-             (fetched-headers headers))
+       (let ((fetched-body body))
          (run-at-time 0 nil
           (lambda ()
             (let* ((meta (+scholar--extract-metadata fetched-body))
@@ -378,10 +377,11 @@ INFO is the parsed protocol plist."
 (defun +scholar/dashboard-open-item ()
   "Open the library item at point."
   (interactive)
-  (when-let ((section (magit-current-section))
-             (value (oref section value)))
-    (when (stringp value)
-      (find-file value))))
+  (when-let* ((section (magit-current-section))
+              (val (and (slot-boundp section 'value)
+                        (oref section value))))
+    (when (stringp val)
+      (find-file val))))
 
 ;;;###autoload
 (defun +scholar/dashboard-add-url ()
@@ -417,8 +417,8 @@ INFO is the parsed protocol plist."
   "Set up reading mode in current buffer."
   ;; Header line
   (let* ((title (org-get-title))
-         (author (org-entry-get (point-min)"AUTHOR"))
-         (state (org-entry-get (point-min)"READ_STATE")))
+         (author (org-entry-get (point-min) "AUTHOR"))
+         (state (org-entry-get (point-min) "READ_STATE")))
     (setq header-line-format
           (format " %s  %s  [%s]"
                   (or title "")
@@ -428,7 +428,7 @@ INFO is the parsed protocol plist."
   (unless (bound-and-true-p writeroom-mode)
     (writeroom-mode 1))
   ;; Auto-set to reading if unread
-  (when (equal (org-entry-get (point-min)"READ_STATE") "unread")
+  (when (equal (org-entry-get (point-min) "READ_STATE") "unread")
     (+scholar--set-read-state (buffer-file-name) "reading")
     (setq header-line-format
           (replace-regexp-in-string "\\[unread\\]" "[reading]" header-line-format))))
@@ -436,14 +436,16 @@ INFO is the parsed protocol plist."
 ;;;###autoload
 (defun +scholar--reading-mode-teardown ()
   "Clean up reading mode."
-  (setq header-line-format nil))
+  (setq header-line-format nil)
+  (when (bound-and-true-p writeroom-mode)
+    (writeroom-mode -1)))
 
 ;;;###autoload
 (defun +scholar/cycle-read-state ()
   "Cycle the read state of the current library node."
   (interactive)
   (let* ((file (buffer-file-name))
-         (current (org-entry-get (point-min)"READ_STATE"))
+         (current (org-entry-get (point-min) "READ_STATE"))
          (next (pcase current
                  ("unread" "reading")
                  ("reading" "read")
@@ -462,21 +464,20 @@ INFO is the parsed protocol plist."
 (defun +scholar/add-annotation ()
   "Add an annotation heading at the current point in the library node."
   (interactive)
-  (let ((pos (point)))
-    (goto-char (point-max))
+  (goto-char (point-max))
     (unless (re-search-backward "^\\* Annotations$" nil t)
       (goto-char (point-max))
       (insert "\n* Annotations\n"))
     (org-end-of-subtree t)
     (insert (format "\n** %s note\n\n"
                     (format-time-string "%Y-%m-%d %H:%M")))
-    (message "scholar: annotation added")))
+    (message "scholar: annotation added"))
 
 ;;;###autoload
 (defun +scholar/open-in-browser ()
   "Open the current library node's URL in an external browser."
   (interactive)
-  (let ((url (org-entry-get (point-min)"ROAM_REFS")))
+  (let ((url (org-entry-get (point-min) "ROAM_REFS")))
     (if url
         (browse-url url)
       (message "scholar: no URL found"))))
