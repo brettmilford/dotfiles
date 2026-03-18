@@ -23,3 +23,13 @@
 
 (defvar scholar-reddit-client-id nil
   "Reddit OAuth client ID for discussion aggregation.")
+
+;;;; Org-protocol
+
+(after! org
+  (add-to-list 'org-protocol-protocol-alist
+               '("scholar-capture"
+                 :protocol "scholar-capture"
+                 :function +scholar--org-protocol-capture)))
+
+;;;###autoload (autoload '+scholar--org-protocol-capture "config/scholar/autoload" nil t)

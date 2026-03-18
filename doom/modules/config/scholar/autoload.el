@@ -141,3 +141,123 @@ STATE is one of: \"unread\", \"reading\", \"read\", \"archived\"."
       (goto-char (point-min))
       (org-set-property "READ_STATE" state))
     (save-buffer)))
+
+;;;###autoload
+(defun +scholar--fetch-url (url callback)
+  "Fetch URL asynchronously, call CALLBACK with (status headers body).
+CALLBACK receives three args: status (int), headers (string), body (string)."
+  (url-retrieve
+   url
+   (lambda (status)
+     (if-let ((err (plist-get status :error)))
+         (funcall callback nil nil nil)
+       (goto-char (point-min))
+       (let* ((headers (buffer-substring-no-properties
+                        (point) (progn (re-search-forward "\n\n" nil t) (point))))
+              (body (buffer-substring-no-properties (point) (point-max)))
+              (code (when (string-match "HTTP/[0-9.]+ \\([0-9]+\\)" headers)
+                      (string-to-number (match-string 1 headers)))))
+         (funcall callback code headers body))))
+   nil t))
+
+;;;###autoload
+(defun +scholar--extract-metadata (html)
+  "Extract metadata from HTML string.
+Returns plist with :title :author :date :site."
+  (let ((title nil) (author nil) (date nil) (site nil))
+    ;; og:title or <title>
+    (when (string-match "<meta[^>]*property=[\"']og:title[\"'][^>]*content=[\"']\\([^\"']+\\)" html)
+      (setq title (match-string 1 html)))
+    (unless title
+      (when (string-match "<title>\\([^<]+\\)</title>" html)
+        (setq title (string-trim (match-string 1 html)))))
+    ;; author
+    (when (string-match "<meta[^>]*name=[\"']author[\"'][^>]*content=[\"']\\([^\"']+\\)" html)
+      (setq author (match-string 1 html)))
+    (unless author
+      (when (string-match "<meta[^>]*property=[\"']article:author[\"'][^>]*content=[\"']\\([^\"']+\\)" html)
+        (setq author (match-string 1 html))))
+    ;; date
+    (when (string-match "<meta[^>]*property=[\"']article:published_time[\"'][^>]*content=[\"']\\([^\"']+\\)" html)
+      (setq date (match-string 1 html)))
+    ;; site name
+    (when (string-match "<meta[^>]*property=[\"']og:site_name[\"'][^>]*content=[\"']\\([^\"']+\\)" html)
+      (setq site (match-string 1 html)))
+    (list :title title :author author :date date :site site)))
+
+;;;###autoload
+(defun +scholar--html-to-org (html)
+  "Convert HTML string to org-mode string via pandoc.
+Returns the org content string, or nil if pandoc fails."
+  (condition-case err
+      (with-temp-buffer
+        (insert html)
+        (let ((exit-code (call-process-region
+                          (point-min) (point-max)
+                          "pandoc" t t nil
+                          "-f" "html" "-t" "org" "--wrap=none")))
+          (if (= exit-code 0)
+              (let ((result (string-trim (buffer-string))))
+                (if (< (length result) 100)
+                    nil  ;; too short, likely garbage
+                  result))
+            (message "scholar: pandoc exited with code %d" exit-code)
+            nil)))
+    (file-missing
+     (message "scholar: pandoc not found. Install pandoc to enable content extraction.")
+     nil)))
+
+;;;###autoload
+(defun +scholar--is-pdf-url (url headers)
+  "Check if URL points to a PDF based on extension or Content-Type HEADERS."
+  (or (string-match-p "\\.pdf\\(?:[?#]\\|$\\)" url)
+      (and headers (string-match-p "content-type:.*application/pdf" (downcase headers)))))
+
+;;;###autoload
+(defun +scholar/capture-url (url &optional title)
+  "Capture URL into the scholar library.
+Fetches content, converts to org, creates a library node.
+TITLE is optional — extracted from HTML if not provided."
+  (interactive "sURL: ")
+  (message "scholar: fetching %s..." url)
+  (+scholar--fetch-url
+   url
+   (lambda (code headers body)
+     (cond
+      ((null code)
+       (message "scholar: failed to fetch %s" url))
+      ((+scholar--is-pdf-url url headers)
+       (message "scholar: URL is a PDF. Use `lit insert --pdf` instead."))
+      (t
+       ;; Copy data out of url-retrieve buffer before processing
+       (let ((fetched-body body)
+             (fetched-headers headers))
+         (run-at-time 0 nil
+          (lambda ()
+            (let* ((meta (+scholar--extract-metadata fetched-body))
+                   (final-title (or title (plist-get meta :title) "Untitled"))
+                   (author (plist-get meta :author))
+                   (org-content (+scholar--html-to-org fetched-body))
+                   (file (+scholar--create-node url final-title "article" "web" author)))
+              (when file
+                ;; Insert converted content into the node
+                (when org-content
+                  (with-current-buffer (find-file-noselect file)
+                    (goto-char (point-min))
+                    (when (re-search-forward "^\\* Content$" nil t)
+                      (forward-line 1)
+                      (insert "\n" org-content "\n"))
+                    (save-buffer)))
+                (message "scholar: captured %s → %s" final-title file)
+                (find-file file)))))))))))
+
+;;;###autoload
+(defun +scholar--org-protocol-capture (info)
+  "Handle org-protocol://scholar-capture?url=URL&title=TITLE.
+INFO is the parsed protocol plist."
+  (let* ((params (org-protocol-parse-parameters info nil '(:url :title)))
+         (url (plist-get params :url))
+         (title (plist-get params :title)))
+    (when url
+      (+scholar/capture-url (org-protocol-sanitize-uri url) title))
+    nil))  ;; return nil to prevent org-protocol from opening a file
