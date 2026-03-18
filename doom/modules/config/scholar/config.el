@@ -62,3 +62,14 @@
   :desc "Dashboard" "s" #'+scholar/dashboard
   :desc "Add URL" "a" #'+scholar/dashboard-add-url
   :desc "Search library" "/" #'+scholar/search-library))
+
+;;;; Reading mode auto-activation
+
+(defun +scholar--maybe-enable-reading-mode ()
+  "Enable +scholar-reading-mode if file is a library node."
+  (when (and buffer-file-name
+             (string-prefix-p (expand-file-name scholar-library-dir)
+                              (expand-file-name buffer-file-name)))
+    (+scholar-reading-mode 1)))
+
+(add-hook 'org-mode-hook #'+scholar--maybe-enable-reading-mode)

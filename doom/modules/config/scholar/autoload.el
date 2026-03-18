@@ -396,3 +396,95 @@ INFO is the parsed protocol plist."
   "Search library nodes with consult-ripgrep."
   (interactive)
   (consult-ripgrep scholar-library-dir))
+
+;;;###autoload
+(define-minor-mode +scholar-reading-mode
+  "Minor mode for reading scholar library items."
+  :lighter " Scholar"
+  :keymap (let ((map (make-sparse-keymap)))
+            (evil-define-key* 'normal map
+              (kbd "r") #'+scholar/cycle-read-state
+              (kbd "n") #'+scholar/add-annotation
+              (kbd "o") #'+scholar/open-in-browser
+              (kbd "q") #'+scholar/back-to-dashboard)
+            map)
+  (if +scholar-reading-mode
+      (+scholar--reading-mode-setup)
+    (+scholar--reading-mode-teardown)))
+
+;;;###autoload
+(defun +scholar--reading-mode-setup ()
+  "Set up reading mode in current buffer."
+  ;; Header line
+  (let* ((title (org-get-title))
+         (author (org-entry-get (point-min)"AUTHOR"))
+         (state (org-entry-get (point-min)"READ_STATE")))
+    (setq header-line-format
+          (format " %s  %s  [%s]"
+                  (or title "")
+                  (if author (concat "by " author) "")
+                  (or state "unread"))))
+  ;; Enable writeroom if not already active
+  (unless (bound-and-true-p writeroom-mode)
+    (writeroom-mode 1))
+  ;; Auto-set to reading if unread
+  (when (equal (org-entry-get (point-min)"READ_STATE") "unread")
+    (+scholar--set-read-state (buffer-file-name) "reading")
+    (setq header-line-format
+          (replace-regexp-in-string "\\[unread\\]" "[reading]" header-line-format))))
+
+;;;###autoload
+(defun +scholar--reading-mode-teardown ()
+  "Clean up reading mode."
+  (setq header-line-format nil))
+
+;;;###autoload
+(defun +scholar/cycle-read-state ()
+  "Cycle the read state of the current library node."
+  (interactive)
+  (let* ((file (buffer-file-name))
+         (current (org-entry-get (point-min)"READ_STATE"))
+         (next (pcase current
+                 ("unread" "reading")
+                 ("reading" "read")
+                 ("read" "archived")
+                 ("archived" "unread")
+                 (_ "reading"))))
+    (+scholar--set-read-state file next)
+    (setq header-line-format
+          (replace-regexp-in-string
+           "\\[\\w+\\]" (format "[%s]" next)
+           (or header-line-format "")))
+    (force-mode-line-update)
+    (message "scholar: %s → %s" current next)))
+
+;;;###autoload
+(defun +scholar/add-annotation ()
+  "Add an annotation heading at the current point in the library node."
+  (interactive)
+  (let ((pos (point)))
+    (goto-char (point-max))
+    (unless (re-search-backward "^\\* Annotations$" nil t)
+      (goto-char (point-max))
+      (insert "\n* Annotations\n"))
+    (org-end-of-subtree t)
+    (insert (format "\n** %s note\n\n"
+                    (format-time-string "%Y-%m-%d %H:%M")))
+    (message "scholar: annotation added")))
+
+;;;###autoload
+(defun +scholar/open-in-browser ()
+  "Open the current library node's URL in an external browser."
+  (interactive)
+  (let ((url (org-entry-get (point-min)"ROAM_REFS")))
+    (if url
+        (browse-url url)
+      (message "scholar: no URL found"))))
+
+;;;###autoload
+(defun +scholar/back-to-dashboard ()
+  "Return to the scholar dashboard."
+  (interactive)
+  (if (get-buffer "*scholar*")
+      (switch-to-buffer "*scholar*")
+    (+scholar/dashboard)))
