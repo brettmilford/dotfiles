@@ -150,3 +150,13 @@
                   "\n- IMPORTANT: The first line is limited to 50 characters and the second line must be empty.")))
 
   (message "config/assistant/config.el was evaluated"))
+
+;;;; Agent Shell
+
+(use-package! agent-shell
+  :after shell-maker
+  :config
+  (setq agent-shell-anthropic-claude-authentication
+        (agent-shell-anthropic-make-authentication
+         :api-key (lambda ()
+                    (auth-source-pick-first-password :host "api.anthropic.com")))))
