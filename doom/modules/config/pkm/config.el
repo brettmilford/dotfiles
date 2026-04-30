@@ -243,7 +243,7 @@ Only called when `window-system' is non-nil."
    org-refile-target-verify-function
    (lambda ()
      "Filters out Archive nodes"
-     (if (string= (nth 4 (org-heading-components)) "Archive")
+     (if (equal (nth 4 (org-heading-components)) "Archive")
          (unless (ignore-errors (org-forward-element))
            (goto-char (point-max))) t))
    org-refile-allow-creating-parent-nodes 'confirm
