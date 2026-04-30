@@ -157,6 +157,4 @@
   :after shell-maker
   :config
   (setq agent-shell-anthropic-claude-authentication
-        (agent-shell-anthropic-make-authentication
-         :api-key (lambda ()
-                    (auth-source-pick-first-password :host "api.anthropic.com")))))
+        (agent-shell-anthropic-make-authentication :login t)))
